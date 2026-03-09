@@ -1,5 +1,7 @@
-# Environment variables
+# Environment variables (SENSITIVE - API keys)
 .env
+.env.*
+*.env
 
 # Python
 __pycache__/
@@ -36,20 +38,34 @@ ENV/
 *.swo
 *~
 
-# Uploaded files
+# Uploaded files (SENSITIVE - may contain PII/financial data)
 uploads/
 *.pdf
 *.png
 *.jpg
 *.jpeg
 
-# Generated files
+# Generated files (SENSITIVE - may contain financial data)
 output/
 *.docx
 demo_cache/*.json
+mca_demo_companies.csv
 
-# Logs
+# API keys and credentials (SENSITIVE)
+*_api_key*
+*_secret*
+*_token*
+credentials.json
+secrets.json
+
+# Database files (SENSITIVE)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs (may contain sensitive data)
 *.log
+logs/
 
 # OS
 .DS_Store
