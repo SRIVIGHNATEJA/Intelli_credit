@@ -48,6 +48,7 @@ uploads/
 # Generated files (SENSITIVE - may contain financial data)
 output/
 *.docx
+*.md
 demo_cache/*.json
 mca_demo_companies.csv
 
