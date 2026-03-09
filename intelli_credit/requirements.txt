@@ -3,6 +3,7 @@
 
 # Web Framework
 streamlit==1.55.0
+streamlit-option-menu==0.3.12
 
 # LLM API
 groq==1.1.0
@@ -24,6 +25,9 @@ kagglehub==0.3.4
 # Data Processing
 pandas==2.2.0
 numpy==1.26.3
+
+# Visualization
+plotly==5.18.0
 
 # Environment Management
 python-dotenv==1.0.1
