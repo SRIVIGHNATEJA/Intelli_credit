@@ -132,6 +132,13 @@ class FinancialData:
     # Period information
     period_months: Optional[int] = None
     
+    # Additional extracted fields
+    ebit: Optional[float] = None
+    depreciation: Optional[float] = None
+    total_credits_in_period: Optional[float] = None
+    gst_turnover_period: Optional[float] = None
+    zero_debt_flag: bool = False
+    
     # Collateral
     collateral_value: Optional[float] = None
     collateral_type: Optional[str] = None  # "Property", "Machinery", "Inventory", "Receivables"
@@ -184,6 +191,11 @@ class FinancialData:
             "gstr_2a_itc": self.gstr_2a_itc,
             "gst_bank_gap_percent": self.gst_bank_gap_percent,
             "period_months": self.period_months,
+            "ebit": self.ebit,
+            "depreciation": self.depreciation,
+            "total_credits_in_period": self.total_credits_in_period,
+            "gst_turnover_period": self.gst_turnover_period,
+            "zero_debt_flag": self.zero_debt_flag,
             "collateral_value": self.collateral_value,
             "collateral_type": self.collateral_type,
             "guarantee_type": self.guarantee_type,
@@ -392,8 +404,24 @@ class CompanyData:
         # Reconstruct nested objects
         financials = None
         if data.get("financials"):
-            financials = FinancialData(**data["financials"])
-        
+            financials_data = data["financials"].copy()
+
+            # Handle backward compatibility for renamed fields
+            if "revenue_history" in financials_data:
+                financials_data["revenue"] = financials_data.pop("revenue_history")
+            if "net_profit_history" in financials_data:
+                financials_data["net_profit"] = financials_data.pop("net_profit_history")
+            if "net_worth_history" in financials_data:
+                financials_data["net_worth"] = financials_data.pop("net_worth_history")
+            if "gst_turnover" in financials_data:
+                financials_data["gst_turnover_annual"] = financials_data.pop("gst_turnover")
+            if "cheque_bounces_12m" in financials_data:
+                financials_data["cheque_bounces_count"] = financials_data.pop("cheque_bounces_12m")
+            if "od_utilization_pct" in financials_data:
+                financials_data["od_utilization_percent"] = financials_data.pop("od_utilization_pct")
+
+            financials = FinancialData(**financials_data)
+
         research = None
         if data.get("research"):
             research_data = data["research"].copy()
@@ -406,7 +434,7 @@ class CompanyData:
             if research_data.get("stock_data"):
                 research_data["stock_data"] = StockData(**research_data["stock_data"])
             research = ResearchResult(**research_data)
-        
+
         # Reconstruct officer notes
         officer_notes = []
         if data.get("officer_notes"):
@@ -419,7 +447,7 @@ class CompanyData:
                 )
                 for note in data["officer_notes"]
             ]
-        
+
         # Reconstruct early warnings
         early_warnings = []
         if data.get("early_warnings"):
@@ -432,7 +460,7 @@ class CompanyData:
                 )
                 for warning in data["early_warnings"]
             ]
-        
+
         return cls(
             cin=data["cin"],
             company_name=data["company_name"],

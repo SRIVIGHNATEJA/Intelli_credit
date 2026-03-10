@@ -22,6 +22,13 @@ EARLY_WARNING_PATTERNS = {
     "AUDIT_QUALIFIED": r"\b(?:qualified opinion|adverse opinion|disclaimer of opinion|qualified audit|adverse audit)\b",
     "PAYMENT_DEFAULT": r"\b(?:payment default|default in payment|defaulted on|failed to pay)\b",
     "LOAN_RECALL": r"\b(?:loan recall|recall of loan|loan recalled|facility recalled)\b",
+    "DEBT_RESTRUCTURING": r"\b(?:debt restructuring|restructured loan|one time settlement|OTS)\b",
+    "INSOLVENCY": r"\b(?:insolvency proceedings|winding up|liquidation|resolution plan)\b",
+    "SARFAESI": r"\b(?:SARFAESI|sarfaesi notice|possession notice|secured creditor action)\b",
+    "NPA": r"\b(?:NPA classification|non.performing asset|substandard asset|doubtful asset)\b",
+    "MATERIAL_UNCERTAINTY": r"\b(?:material uncertainty|significant doubt|substantial doubt)\b",
+    "AUDITOR_CHANGE": r"\b(?:auditor resignation|change of auditor|new auditor appointed)\b",
+    "WORKING_CAPITAL_STRESS": r"\b(?:working capital stress|liquidity crunch|cash flow stress)\b",
 }
 
 
@@ -35,6 +42,13 @@ SIGNAL_SEVERITY_MAP = {
     "AUDIT_QUALIFIED": Severity.MEDIUM,
     "PAYMENT_DEFAULT": Severity.HIGH,
     "LOAN_RECALL": Severity.HIGH,
+    "DEBT_RESTRUCTURING": Severity.HIGH,
+    "INSOLVENCY": Severity.HIGH,
+    "SARFAESI": Severity.HIGH,
+    "NPA": Severity.HIGH,
+    "MATERIAL_UNCERTAINTY": Severity.MEDIUM,
+    "AUDITOR_CHANGE": Severity.MEDIUM,
+    "WORKING_CAPITAL_STRESS": Severity.MEDIUM,
 }
 
 
@@ -67,6 +81,18 @@ def scan_for_warnings(text: str, source_document: str) -> List[EarlyWarning]:
         matches = re.finditer(pattern, text, re.IGNORECASE)
         
         for match in matches:
+            # Check for negation in preceding 60 chars
+            start_pos = max(0, match.start() - 60)
+            preceding_text = text[start_pos:match.start()].lower()
+            negation_words = ["no ", "not ", "nil ", "zero ",
+                            "without ", "absence of ",
+                            "no history of ", "never had ",
+                            "no such ", "no pending "]
+            is_negated = any(neg in preceding_text
+                           for neg in negation_words)
+            if is_negated:
+                continue
+            
             all_matches.append({
                 'signal_type': signal_type,
                 'start': match.start(),

@@ -714,6 +714,12 @@ def page_application_intake():
                 
                 score_result = calculate_five_cs(company_data)
                 
+                from report_generator import generate_decision_narrative
+                score_result.decision_narrative = generate_decision_narrative(
+                    score_result.flags,
+                    score_result.verdict.value
+                )
+                
                 st.write("📄 Step 6/6: Generating CAM document...")
                 progress_bar.progress(95)
                 
@@ -813,7 +819,7 @@ def page_credit_analysis():
     # Decision banner
     render_decision_banner(
         verdict=score_result.verdict.value,
-        score=score_result.total_score,
+        score=score_result.final_score,
         interest_rate=score_result.interest_rate if score_result.interest_rate else "N/A",
         flags_count=len(score_result.flags)
     )
@@ -826,7 +832,7 @@ def page_credit_analysis():
     m1, m2, m3, m4 = st.columns(4, gap="medium")
     
     with m1:
-        render_metric_card("Credit Score", f"{score_result.total_score:.1f}", "🎯", "#667eea")
+        render_metric_card("Credit Score", f"{score_result.final_score:.1f}", "🎯", "#667eea")
     
     with m2:
         render_metric_card("Interest Rate", score_result.interest_rate if score_result.interest_rate else "N/A", "💰", "#10b981")
@@ -885,7 +891,7 @@ def page_credit_analysis():
     
     gauge_col1, gauge_col2, gauge_col3 = st.columns([1, 2, 1])
     with gauge_col2:
-        fig_gauge = create_risk_gauge(score_result.total_score)
+        fig_gauge = create_risk_gauge(score_result.final_score)
         st.plotly_chart(fig_gauge)
     
     st.markdown("</div>", unsafe_allow_html=True)
@@ -941,7 +947,7 @@ def page_credit_analysis():
             "Weight": ["25%", "30%", "20%", "15%", "10%", "100%"],
             "Weighted": [f"{score_result.character_score * 0.25:.1f}", f"{score_result.capacity_score * 0.30:.1f}",
                         f"{score_result.capital_score * 0.20:.1f}", f"{score_result.collateral_score * 0.15:.1f}",
-                        f"{score_result.conditions_score * 0.10:.1f}", f"{score_result.total_score:.1f}"]
+                        f"{score_result.conditions_score * 0.10:.1f}", f"{score_result.final_score:.1f}"]
         })
         st.dataframe(summary_df, hide_index=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -1070,7 +1076,7 @@ def page_credit_analysis():
                     adjusted_scores["CONDITIONS"] * 0.10
                 )
                 
-                total_change = adjusted_total - score_result.total_score
+                total_change = adjusted_total - score_result.final_score
                 
                 if abs(total_change) > 0.1:
                     change_color = "#10b981" if total_change > 0 else "#ef4444"
@@ -1332,7 +1338,7 @@ def page_research():
         </div>
         """, unsafe_allow_html=True)
     with s2:
-        outlook_emoji = {"POSITIVE": "📈", "NEUTRAL": "➡️", "DISTRESSED": "📉"}.get(research.sector_outlook, "")
+        outlook_emoji = {"GROWING": "📈", "STABLE": "➡️", "DECLINING": "📉", "DISTRESSED": "�"}.get(research.sector_outlook, "➡️")
         outlook_color = {"POSITIVE": "#10b981", "NEUTRAL": "#f59e0b", "DISTRESSED": "#ef4444"}.get(research.sector_outlook, "#6b7280")
         st.markdown(f"""
         <div style="text-align: center; padding: 1rem;">
@@ -1707,7 +1713,7 @@ def main():
         
         # Quick stats if processing complete
         if st.session_state.processing_complete and st.session_state.score_result:
-            score = st.session_state.score_result.total_score
+            score = st.session_state.score_result.final_score
             verdict = st.session_state.score_result.verdict.value
             
             verdict_color = {"APPROVE": "#10b981", "REJECT": "#ef4444", "CONDITIONAL": "#f59e0b"}.get(verdict, "#6b7280")

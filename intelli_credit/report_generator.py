@@ -31,7 +31,10 @@ def format_table(doc: Document, headers: List[str], rows: List[List[str]]) -> No
         rows: List of row data (each row is a list of strings)
     """
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
-    table.style = 'Light Grid Accent 1'
+    try:
+        table.style = 'Light Grid Accent 1'
+    except KeyError:
+        table.style = 'Table Grid'
     
     # Add headers
     header_cells = table.rows[0].cells
@@ -55,46 +58,36 @@ def format_table(doc: Document, headers: List[str], rows: List[List[str]]) -> No
 
 
 def format_currency_inr(amount: Optional[float], unit: str = "Crores") -> str:
-    """
-    Format currency in Indian format (₹ 1,00,000.00 Crores).
-    
-    Args:
-        amount: Amount in Crores
-        unit: "Crores" or "Lakhs"
-        
-    Returns:
-        str: Formatted currency string in Indian notation
-    """
     if amount is None:
         return "N/A"
     
     if unit == "Lakhs":
-        amount = amount * 100  # Convert Crores to Lakhs
+        amount = amount * 100
     
-    # Format with Indian comma notation (last 3 digits, then groups of 2)
-    amount_str = f"{amount:.2f}"
-    parts = amount_str.split('.')
-    integer_part = parts[0]
-    decimal_part = parts[1] if len(parts) > 1 else "00"
+    # Indian grouping: last 3, then pairs
+    integer_part = str(int(abs(amount)))
+    decimal_part = f"{abs(amount) % 1:.2f}"[1:]
+    sign = "-" if amount < 0 else ""
     
-    # Apply Indian grouping
-    if len(integer_part) > 3:
-        last_three = integer_part[-3:]
-        remaining = integer_part[:-3]
-        
-        # Group remaining digits in pairs from right to left
-        grouped = []
-        for i in range(len(remaining) - 1, -1, -2):
-            if i == 0:
-                grouped.append(remaining[0])
-            else:
-                grouped.append(remaining[max(0, i-1):i+1])
-        
-        indian_format = ','.join(reversed(grouped)) + ',' + last_three
+    n = len(integer_part)
+    if n <= 3:
+        formatted = integer_part
     else:
-        indian_format = integer_part
+        last_three = integer_part[-3:]
+        rest = integer_part[:-3]
+        
+        # Group rest in pairs from right
+        pairs = []
+        while len(rest) > 2:
+            pairs.append(rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            pairs.append(rest)
+        pairs.reverse()
+        
+        formatted = ','.join(pairs) + ',' + last_three
     
-    return f"₹ {indian_format}.{decimal_part} {unit}"
+    return f"{sign}₹ {formatted}{decimal_part} {unit}"
 
 
 def add_executive_summary(doc: Document, company_data: CompanyData, score_result: ScoreResult) -> None:
@@ -127,7 +120,7 @@ def add_executive_summary(doc: Document, company_data: CompanyData, score_result
     
     # Key metrics table
     key_metrics = [
-        ["Total Credit Score", f"{score_result.total_score:.1f}/100"],
+        ["Total Credit Score", f"{score_result.final_score:.1f}/100"],
         ["Loan Amount Requested", format_currency_inr(company_data.financials.loan_requested if company_data.financials else None)],
         ["Loan Amount Approved", format_currency_inr(score_result.loan_amount)],
         ["Interest Rate", score_result.interest_rate if score_result.interest_rate else "N/A"],
@@ -273,7 +266,7 @@ def add_five_cs_breakdown(doc: Document, score_result: ScoreResult) -> None:
         ["CAPITAL", f"{score_result.capital_score:.1f}", "20%", f"{score_result.capital_score * 0.20:.1f}"],
         ["COLLATERAL", f"{score_result.collateral_score:.1f}", "15%", f"{score_result.collateral_score * 0.15:.1f}"],
         ["CONDITIONS", f"{score_result.conditions_score:.1f}", "10%", f"{score_result.conditions_score * 0.10:.1f}"],
-        ["TOTAL WEIGHTED SCORE", "", "", f"{score_result.total_score:.1f}"]
+        ["TOTAL WEIGHTED SCORE", "", "", f"{score_result.final_score:.1f}"]
     ]
     
     format_table(doc, ["Category", "Score (/100)", "Weight", "Weighted Score"], score_rows)
@@ -497,7 +490,7 @@ def add_recommendation(doc: Document, score_result: ScoreResult) -> None:
     terms_rows = [
         ["Approved Loan Amount", format_currency_inr(score_result.loan_amount)],
         ["Interest Rate", score_result.interest_rate if score_result.interest_rate else "N/A"],
-        ["Total Credit Score", f"{score_result.total_score:.1f}/100"]
+        ["Total Credit Score", f"{score_result.final_score:.1f}/100"]
     ]
     
     format_table(doc, ["Term", "Value"], terms_rows)
@@ -717,7 +710,7 @@ def test_report_generator():
     print(f"  - GST Analysis")
     print(f"  - Research Findings with {len(ilfs_research.news_items)} news items")
     print(f"  - Final Recommendation")
-    print(f"\nTotal Score: {score_result.total_score:.1f}/100")
+    print(f"\nTotal Score: {score_result.final_score:.1f}/100")
     print(f"Verdict: {score_result.verdict.value}")
     
     return generated_path

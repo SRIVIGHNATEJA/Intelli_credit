@@ -676,36 +676,7 @@ def calculate_capital_score(financials: FinancialData) -> Tuple[float, List[Flag
                 -35.0
             ))
     
-    # Promoter pledge % (also affects CAPITAL)
-    if financials.promoter_pledge_pct is not None:
-        pledge = financials.promoter_pledge_pct
-        if pledge > 50:
-            score -= 40
-            flags.append(create_flag(
-                FlagCategory.CAPITAL,
-                Severity.HIGH,
-                f"Promoter pledge {pledge:.1f}% (high distress signal)",
-                "Stock Exchange Filing",
-                -40.0
-            ))
-        elif pledge > 25:
-            score -= 25
-            flags.append(create_flag(
-                FlagCategory.CAPITAL,
-                Severity.MEDIUM,
-                f"Promoter pledge {pledge:.1f}% (moderate concern)",
-                "Stock Exchange Filing",
-                -25.0
-            ))
-        elif pledge > 10:
-            score -= 10
-            flags.append(create_flag(
-                FlagCategory.CAPITAL,
-                Severity.LOW,
-                f"Promoter pledge {pledge:.1f}% (minor concern)",
-                "Stock Exchange Filing",
-                -10.0
-            ))
+
     
     # Apply floor
     score = apply_floor_ceiling(score, floor=10.0)
@@ -972,7 +943,7 @@ def determine_verdict(final_score: float, bank_credits_annual: Optional[float], 
     # CRITICAL FIX: Ensure proper comparison logic
     if final_score >= 70.0:  # Changed from > to >= to handle edge case
         # APPROVE
-        if bank_credits_annual and loan_requested:
+        if bank_credits_annual is not None and loan_requested is not None:
             loan_amount = min(bank_credits_annual * 3.5, loan_requested)
         else:
             loan_amount = loan_requested
@@ -989,7 +960,7 @@ def determine_verdict(final_score: float, bank_credits_annual: Optional[float], 
     
     elif final_score >= 50.0:
         # CONDITIONAL APPROVE
-        if bank_credits_annual and loan_requested:
+        if bank_credits_annual is not None and loan_requested is not None:
             loan_amount = min(bank_credits_annual * 2.0, loan_requested)
         else:
             loan_amount = loan_requested * 0.7 if loan_requested else None
@@ -1036,10 +1007,16 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
     gst_flags = []
     if company_data.financials:
         # Check for GST circular trading
-        if company_data.financials.gst_turnover_annual and company_data.financials.bank_credits_annual:
-            gst_gap = ((company_data.financials.gst_turnover_annual - company_data.financials.bank_credits_annual) 
-                      / company_data.financials.gst_turnover_annual * 100)
-            
+        # Use precomputed gap from pipeline if available
+        if company_data.financials.gst_bank_gap_percent is not None:
+            gst_gap = company_data.financials.gst_bank_gap_percent
+        elif company_data.financials.gst_turnover_annual and company_data.financials.bank_credits_annual:
+            # compute here as fallback
+            gst_gap = abs(company_data.financials.gst_turnover_annual - company_data.financials.bank_credits_annual) / company_data.financials.gst_turnover_annual * 100
+        else:
+            gst_gap = None
+        
+        if gst_gap is not None:
             if gst_gap >= 35:
                 gst_flags.append(create_flag(
                     FlagCategory.GST_FRAUD,
@@ -1087,6 +1064,14 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
                         "GSTR-3B vs GSTR-2A",
                         -10.0
                     ))
+        elif company_data.financials.gstr_3b_itc and not company_data.financials.gstr_2a_itc:
+            gst_flags.append(create_flag(
+                FlagCategory.GST_FRAUD,
+                Severity.LOW,
+                "GSTR-2A not uploaded — ITC fraud check skipped",
+                "GSTR-3B vs GSTR-2A",
+                0.0
+            ))
     
     capacity_score, cap_flags = calculate_capacity_score(company_data.financials, gst_flags)
     all_flags.extend(cap_flags)
@@ -1261,7 +1246,7 @@ def validate_scorer_with_ilfs():
     print(f"CAPITAL Score: {result.capital_score:.1f}/100 (Expected: ~10)")
     print(f"COLLATERAL Score: {result.collateral_score:.1f}/100 (Expected: ~40)")
     print(f"CONDITIONS Score: {result.conditions_score:.1f}/100 (Expected: ~35)")
-    print(f"\nTOTAL SCORE: {result.total_score:.1f}/100 (Expected: 13-18)")
+    print(f"\nTOTAL SCORE: {result.final_score:.1f}/100 (Expected: 13-18)")
     print(f"VERDICT: {result.verdict.value} (Expected: REJECT)")
     
     # Validate ranges
@@ -1270,7 +1255,7 @@ def validate_scorer_with_ilfs():
     assert 8 <= result.capital_score <= 15, f"CAPITAL score {result.capital_score} out of expected range"
     assert 35 <= result.collateral_score <= 50, f"COLLATERAL score {result.collateral_score} out of expected range"
     assert 15 <= result.conditions_score <= 40, f"CONDITIONS score {result.conditions_score} out of expected range"
-    assert 13 <= result.total_score <= 20, f"TOTAL score {result.total_score} out of expected range (13-20)"
+    assert 13 <= result.final_score <= 20, f"TOTAL score {result.final_score} out of expected range (13-20)"
     assert result.verdict == Verdict.REJECT, f"Verdict should be REJECT, got {result.verdict.value}"
     
     print("\n✅ All validations PASSED!")

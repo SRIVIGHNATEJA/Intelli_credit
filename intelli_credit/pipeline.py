@@ -32,6 +32,81 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# DERIVED FIELDS COMPUTATION
+# ============================================================================
+
+def compute_derived_fields(financials: FinancialData) -> FinancialData:
+    """
+    Compute all derived ratios from raw extracted values.
+    Pure Python math. No LLM. Fully deterministic.
+    Called after extraction, before scoring.
+    """
+    # EBITDA = EBIT + Depreciation (if not labeled)
+    if financials.ebitda is None:
+        ebit = getattr(financials, 'ebit', None)
+        dep = financials.depreciation if hasattr(financials, 'depreciation') else None
+        if ebit is not None and dep is not None:
+            financials.ebitda = ebit + dep
+        elif ebit is not None:
+            financials.ebitda = ebit
+    
+    # DSCR = EBITDA / Finance Cost
+    if financials.dscr is None:
+        ebitda = financials.ebitda
+        fc = financials.finance_cost
+        if ebitda is not None and fc and fc > 0:
+            financials.dscr = round(ebitda / fc, 2)
+        elif ebitda is not None and (fc == 0 or fc is None):
+            zero_debt = getattr(financials, 'zero_debt_flag', False)
+            if zero_debt:
+                financials.dscr = 10.0
+    
+    # TOTAL DEBT = Long-term + Short-term
+    if financials.total_debt is None:
+        ltd = financials.long_term_debt
+        stb = financials.short_term_borrowings
+        if ltd is not None and stb is not None:
+            financials.total_debt = ltd + stb
+        elif ltd is not None:
+            financials.total_debt = ltd
+        elif stb is not None:
+            financials.total_debt = stb
+    
+    # D/E RATIO = Total Debt / Net Worth
+    if financials.debt_equity_ratio is None:
+        debt = financials.total_debt
+        nw = financials.net_worth
+        nw_val = nw[0] if isinstance(nw, list) and nw else nw
+        if debt is not None and nw_val and nw_val > 0:
+            financials.debt_equity_ratio = round(debt / nw_val, 4)
+        elif debt == 0:
+            financials.debt_equity_ratio = 0.0
+    
+    # BANK CREDITS ANNUAL = Period Credits / Months * 12
+    if financials.bank_credits_annual is None:
+        credits = getattr(financials, 'total_credits_in_period', None)
+        months = financials.period_months
+        if credits and months and months > 0:
+            financials.bank_credits_annual = round(credits / months * 12, 2)
+    
+    # GST TURNOVER ANNUAL = Period Turnover / Months * 12
+    if financials.gst_turnover_annual is None:
+        turnover = getattr(financials, 'gst_turnover_period', None)
+        months = financials.period_months
+        if turnover and months and months > 0:
+            financials.gst_turnover_annual = round(turnover / months * 12, 2)
+    
+    # GST-BANK GAP %
+    if financials.gst_bank_gap_percent is None:
+        gst = financials.gst_turnover_annual
+        bank = financials.bank_credits_annual
+        if gst and bank and gst > 0:
+            financials.gst_bank_gap_percent = round(abs(gst - bank) / gst * 100, 2)
+    
+    return financials
+
+
+# ============================================================================
 # DEMO MODE SUPPORT (Task 16.1)
 # ============================================================================
 
@@ -76,7 +151,7 @@ def load_demo_cache(company_name: str, cache_dir: str = "demo_cache") -> Optiona
 def extract_all_documents(
     uploaded_files: Dict[str, str],
     groq_client: Optional[Groq] = None
-) -> FinancialData:
+) -> tuple[FinancialData, Dict[str, str]]:
     """
     Extract data from all uploaded PDFs and build FinancialData object.
     
@@ -88,12 +163,15 @@ def extract_all_documents(
         groq_client: Optional Groq client instance
         
     Returns:
-        FinancialData object with extracted data (never None)
+        tuple: (FinancialData object, Dict of raw texts by doc_type)
     """
     logger.info("Starting document extraction...")
     
     # Initialize empty FinancialData
     financials = FinancialData()
+    
+    # Also store raw text for detector
+    raw_texts = {}
     
     # Initialize Groq client if not provided
     if groq_client is None:
@@ -115,6 +193,9 @@ def extract_all_documents(
                 logger.warning(f"No data extracted from {doc_type}")
                 continue
             
+            # Store text keyed by doc_type
+            raw_texts[doc_type] = str(extracted)
+            
             # Map extracted data to FinancialData fields
             _map_extracted_to_financials(financials, doc_type, extracted)
             
@@ -125,7 +206,7 @@ def extract_all_documents(
             continue
     
     logger.info("Document extraction complete")
-    return financials
+    return financials, raw_texts
 
 
 def _map_extracted_to_financials(
@@ -145,38 +226,58 @@ def _map_extracted_to_financials(
         if doc_type == "balance_sheet":
             # Balance sheet data
             if "net_worth" in extracted:
-                financials.net_worth = extracted["net_worth"]
-            if "total_debt" in extracted:
-                financials.total_debt = extracted["total_debt"]
-            if "current_ratio" in extracted:
-                financials.current_ratio = extracted["current_ratio"]
-            if "debt_equity_ratio" in extracted:
-                financials.debt_equity_ratio = extracted["debt_equity_ratio"]
+                nw = extracted["net_worth"]
+                financials.net_worth = [nw] if isinstance(nw, float) else nw
+            if "long_term_debt" in extracted:
+                financials.long_term_debt = extracted["long_term_debt"]
+            if "short_term_borrowings" in extracted:
+                financials.short_term_borrowings = extracted["short_term_borrowings"]
+            if "zero_debt_flag" in extracted:
+                financials.zero_debt_flag = extracted["zero_debt_flag"]
+            if "current_assets" in extracted and "current_liabilities" in extracted:
+                ca = extracted["current_assets"]
+                cl = extracted["current_liabilities"]
+                if ca and cl and cl > 0:
+                    financials.current_ratio = round(ca / cl, 2)
         
         elif doc_type == "profit_loss":
             # P&L data
             if "revenue" in extracted:
-                financials.revenue = extracted["revenue"]
+                rev = extracted["revenue"]
+                financials.revenue = [rev] if isinstance(rev, float) else rev
             if "net_profit" in extracted:
-                financials.net_profit = extracted["net_profit"]
+                np_ = extracted["net_profit"]
+                financials.net_profit = [np_] if isinstance(np_, float) else np_
             if "ebitda" in extracted:
                 financials.ebitda = extracted["ebitda"]
-            if "interest_coverage" in extracted:
-                financials.interest_coverage = extracted["interest_coverage"]
+            if "ebit" in extracted:
+                financials.ebit = extracted["ebit"]
+            if "finance_cost" in extracted:
+                financials.finance_cost = extracted["finance_cost"]
+            if "depreciation" in extracted:
+                financials.depreciation = extracted["depreciation"]
         
         elif doc_type == "bank_statements":
             # Bank statement data
-            if "bank_credits_annual" in extracted:
-                financials.bank_credits_annual = extracted["bank_credits_annual"]
+            if "total_credits_in_period" in extracted:
+                financials.total_credits_in_period = extracted["total_credits_in_period"]
+            if "period_months" in extracted:
+                financials.period_months = extracted["period_months"]
             if "cheque_bounces_count" in extracted:
-                financials.cheque_bounces_count = extracted["cheque_bounces_count"]
-            if "od_utilization_percent" in extracted:
-                financials.od_utilization_percent = extracted["od_utilization_percent"]
+                val = extracted["cheque_bounces_count"]
+                financials.cheque_bounces_count = val if val is not None else 0
+            if "od_limit" in extracted and "od_utilized" in extracted:
+                limit = extracted["od_limit"]
+                used = extracted["od_utilized"]
+                if limit and used and limit > 0:
+                    financials.od_utilization_percent = round(used/limit*100, 1)
         
         elif doc_type == "gst_returns":
             # GST data
-            if "gst_turnover_annual" in extracted:
-                financials.gst_turnover_annual = extracted["gst_turnover_annual"]
+            if "gst_turnover_period" in extracted:
+                financials.gst_turnover_period = extracted["gst_turnover_period"]
+            if "period_months" in extracted and not financials.period_months:
+                financials.period_months = extracted["period_months"]
             if "gstr_3b_itc" in extracted:
                 financials.gstr_3b_itc = extracted["gstr_3b_itc"]
             if "gstr_2a_itc" in extracted:
@@ -184,7 +285,7 @@ def _map_extracted_to_financials(
         
         elif doc_type == "itr":
             # ITR data (may overlap with P&L)
-            if "revenue" in extracted and not financials.revenue:
+            if "revenue" in extracted and (not financials.revenue or len(financials.revenue) == 0):
                 financials.revenue = extracted["revenue"]
             if "net_profit" in extracted and not financials.net_profit:
                 financials.net_profit = extracted["net_profit"]
@@ -258,7 +359,9 @@ def run_analysis_pipeline(
             
             if gst_flags:
                 logger.info(f"Found {len(gst_flags)} GST fraud flags")
-                # GST flags will be picked up by scorer from financials
+                if not hasattr(company_data, 'gst_flags'):
+                    company_data.gst_flags = []
+                company_data.gst_flags.extend(gst_flags)
             else:
                 logger.info("No GST fraud flags detected")
                 
@@ -357,7 +460,7 @@ def process_application(
                 company_data, score_result = cache_result
                 logger.info("✓ Demo cache loaded successfully")
                 logger.info(f"Verdict: {score_result.verdict.value}")
-                logger.info(f"Total Score: {score_result.total_score:.1f}")
+                logger.info(f"Total Score: {score_result.final_score:.1f}")
                 return company_data
             else:
                 logger.warning("Demo cache not found, falling back to real mode...")
@@ -381,15 +484,19 @@ def process_application(
             return company_data
         
         # Extract all documents
-        financials = extract_all_documents(uploaded_files)
+        financials, raw_texts = extract_all_documents(uploaded_files)
         company_data.financials = financials
+        
+        # Compute derived ratios
+        company_data.financials = compute_derived_fields(company_data.financials)
+        logger.info("Derived ratios computed")
         
         # Run analysis pipeline
         company_data = run_analysis_pipeline(
             company_data=company_data,
             gst_data=None,  # Could be passed if available
             bank_data=None,  # Could be passed if available
-            all_extracted_text=None  # Could extract text during parsing
+            all_extracted_text=raw_texts
         )
         
         logger.info(f"\n{'='*60}")

@@ -33,7 +33,7 @@ def test_demo_company(company_key: str):
         print(f"✅ Cache loaded successfully")
         print(f"   Company: {company_data.company_name}")
         print(f"   CIN: {company_data.cin}")
-        print(f"   Score: {score_result.total_score:.1f}/100")
+        print(f"   Score: {score_result.final_score:.1f}/100")
         print(f"   Verdict: {score_result.verdict.value}")
         
         # Test 2: Verify verdict matches expected
@@ -93,7 +93,7 @@ def test_demo_company(company_key: str):
         
         # Summary
         print(f"\n📊 {company_key} SUMMARY:")
-        print(f"   Score: {score_result.total_score:.1f}/100")
+        print(f"   Score: {score_result.final_score:.1f}/100")
         print(f"   Verdict: {score_result.verdict.value}")
         print(f"   Flags: {len(score_result.flags)}")
         print(f"   Interest Rate: {score_result.interest_rate or 'N/A'}")

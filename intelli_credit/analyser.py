@@ -38,7 +38,7 @@ def calculate_gst_gap_percentage(
     if gst_turnover == 0:
         return None
     
-    gap = ((gst_turnover - bank_credits_annual) / gst_turnover) * 100
+    gap = (abs(gst_turnover - bank_credits_annual) / gst_turnover) * 100
     return gap
 
 
