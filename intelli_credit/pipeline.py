@@ -144,8 +144,8 @@ def _map_extracted_to_financials(
     try:
         if doc_type == "balance_sheet":
             # Balance sheet data
-            if "net_worth_history" in extracted:
-                financials.net_worth_history = extracted["net_worth_history"]
+            if "net_worth" in extracted:
+                financials.net_worth = extracted["net_worth"]
             if "total_debt" in extracted:
                 financials.total_debt = extracted["total_debt"]
             if "current_ratio" in extracted:
@@ -155,10 +155,10 @@ def _map_extracted_to_financials(
         
         elif doc_type == "profit_loss":
             # P&L data
-            if "revenue_history" in extracted:
-                financials.revenue_history = extracted["revenue_history"]
-            if "net_profit_history" in extracted:
-                financials.net_profit_history = extracted["net_profit_history"]
+            if "revenue" in extracted:
+                financials.revenue = extracted["revenue"]
+            if "net_profit" in extracted:
+                financials.net_profit = extracted["net_profit"]
             if "ebitda" in extracted:
                 financials.ebitda = extracted["ebitda"]
             if "interest_coverage" in extracted:
@@ -168,15 +168,15 @@ def _map_extracted_to_financials(
             # Bank statement data
             if "bank_credits_annual" in extracted:
                 financials.bank_credits_annual = extracted["bank_credits_annual"]
-            if "cheque_bounces_12m" in extracted:
-                financials.cheque_bounces_12m = extracted["cheque_bounces_12m"]
-            if "od_utilization_pct" in extracted:
-                financials.od_utilization_pct = extracted["od_utilization_pct"]
+            if "cheque_bounces_count" in extracted:
+                financials.cheque_bounces_count = extracted["cheque_bounces_count"]
+            if "od_utilization_percent" in extracted:
+                financials.od_utilization_percent = extracted["od_utilization_percent"]
         
         elif doc_type == "gst_returns":
             # GST data
-            if "gst_turnover" in extracted:
-                financials.gst_turnover = extracted["gst_turnover"]
+            if "gst_turnover_annual" in extracted:
+                financials.gst_turnover_annual = extracted["gst_turnover_annual"]
             if "gstr_3b_itc" in extracted:
                 financials.gstr_3b_itc = extracted["gstr_3b_itc"]
             if "gstr_2a_itc" in extracted:
@@ -184,10 +184,10 @@ def _map_extracted_to_financials(
         
         elif doc_type == "itr":
             # ITR data (may overlap with P&L)
-            if "revenue_history" in extracted and not financials.revenue_history:
-                financials.revenue_history = extracted["revenue_history"]
-            if "net_profit_history" in extracted and not financials.net_profit_history:
-                financials.net_profit_history = extracted["net_profit_history"]
+            if "revenue" in extracted and not financials.revenue:
+                financials.revenue = extracted["revenue"]
+            if "net_profit" in extracted and not financials.net_profit:
+                financials.net_profit = extracted["net_profit"]
         
         elif doc_type == "sanction_letter":
             # Sanction letter data
@@ -469,8 +469,8 @@ def get_processing_summary(company_data: CompanyData) -> Dict[str, Any]:
     }
     
     if company_data.financials:
-        summary["revenue_years"] = len(company_data.financials.revenue_history)
-        summary["has_gst_data"] = company_data.financials.gst_turnover is not None
+        summary["revenue_years"] = len(company_data.financials.revenue)
+        summary["has_gst_data"] = company_data.financials.gst_turnover_annual is not None
         summary["has_bank_data"] = company_data.financials.bank_credits_annual is not None
     
     if company_data.research:

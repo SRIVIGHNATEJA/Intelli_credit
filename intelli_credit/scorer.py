@@ -60,7 +60,7 @@ def apply_floor_ceiling(score: float, floor: float = 10.0, ceiling: float = 100.
 
 
 def generate_reasoning(
-    total_score: float,
+    final_score: float,
     character_score: float,
     capacity_score: float,
     capital_score: float,
@@ -72,7 +72,7 @@ def generate_reasoning(
     Generate human-readable reasoning for the credit decision.
     
     Args:
-        total_score: Final weighted score
+        final_score: Final weighted score
         character_score: CHARACTER score
         capacity_score: CAPACITY score
         capital_score: CAPITAL score
@@ -93,7 +93,7 @@ def generate_reasoning(
     
     # Build reasoning
     lines = [
-        f"Total Credit Score: {total_score:.1f}/100",
+        f"Total Credit Score: {final_score:.1f}/100",
         "",
         "Component Scores:",
         f"  CHARACTER (25%): {character_score:.1f}/100",
@@ -408,8 +408,8 @@ def calculate_capacity_score(financials: FinancialData, gst_flags: List[FlagItem
         ))
     
     # Revenue YoY Growth
-    if financials.revenue_history and len(financials.revenue_history) >= 2:
-        rev = financials.revenue_history
+    if financials.revenue and len(financials.revenue) >= 2:
+        rev = financials.revenue
         
         # Check for two consecutive year decline
         if len(rev) >= 3 and rev[0] < rev[1] and rev[1] < rev[2]:
@@ -457,60 +457,60 @@ def calculate_capacity_score(financials: FinancialData, gst_flags: List[FlagItem
                     ))
     
     # Cheque bounces
-    if financials.cheque_bounces_12m > 5:
+    if financials.cheque_bounces_count > 5:
         score -= 40
         flags.append(create_flag(
             FlagCategory.CAPACITY,
             Severity.HIGH,
-            f"{financials.cheque_bounces_12m} cheque bounces in 12 months",
+            f"{financials.cheque_bounces_count} cheque bounces in 12 months",
             "Bank Statements",
             -40.0
         ))
-    elif financials.cheque_bounces_12m >= 3:
+    elif financials.cheque_bounces_count >= 3:
         score -= 25
         flags.append(create_flag(
             FlagCategory.CAPACITY,
             Severity.MEDIUM,
-            f"{financials.cheque_bounces_12m} cheque bounces in 12 months",
+            f"{financials.cheque_bounces_count} cheque bounces in 12 months",
             "Bank Statements",
             -25.0
         ))
-    elif financials.cheque_bounces_12m >= 1:
+    elif financials.cheque_bounces_count >= 1:
         score -= 10
         flags.append(create_flag(
             FlagCategory.CAPACITY,
             Severity.LOW,
-            f"{financials.cheque_bounces_12m} cheque bounce(s) in 12 months",
+            f"{financials.cheque_bounces_count} cheque bounce(s) in 12 months",
             "Bank Statements",
             -10.0
         ))
     
     # OD Utilization
-    if financials.od_utilization_pct is not None:
-        if financials.od_utilization_pct > 90:
+    if financials.od_utilization_percent is not None:
+        if financials.od_utilization_percent > 90:
             score -= 25
             flags.append(create_flag(
                 FlagCategory.CAPACITY,
                 Severity.HIGH,
-                f"OD utilization {financials.od_utilization_pct:.1f}% (overextended)",
+                f"OD utilization {financials.od_utilization_percent:.1f}% (overextended)",
                 "Bank Statements",
                 -25.0
             ))
-        elif financials.od_utilization_pct > 70:
+        elif financials.od_utilization_percent > 70:
             score -= 15
             flags.append(create_flag(
                 FlagCategory.CAPACITY,
                 Severity.MEDIUM,
-                f"OD utilization {financials.od_utilization_pct:.1f}% (high)",
+                f"OD utilization {financials.od_utilization_percent:.1f}% (high)",
                 "Bank Statements",
                 -15.0
             ))
-        elif financials.od_utilization_pct > 50:
+        elif financials.od_utilization_percent > 50:
             score -= 5
             flags.append(create_flag(
                 FlagCategory.CAPACITY,
                 Severity.LOW,
-                f"OD utilization {financials.od_utilization_pct:.1f}% (moderate)",
+                f"OD utilization {financials.od_utilization_percent:.1f}% (moderate)",
                 "Bank Statements",
                 -5.0
             ))
@@ -611,8 +611,8 @@ def calculate_capital_score(financials: FinancialData) -> Tuple[float, List[Flag
         ))
     
     # Net Worth trend
-    if financials.net_worth_history and len(financials.net_worth_history) >= 2:
-        nw = financials.net_worth_history
+    if financials.net_worth and len(financials.net_worth) >= 2:
+        nw = financials.net_worth
         
         # Check if negative
         if nw[0] < 0:
@@ -954,20 +954,23 @@ def calculate_conditions_score(sector: str, research: Optional[ResearchResult]) 
 # TASK 7.7: VERDICT DETERMINATION LOGIC
 # ============================================================================
 
-def determine_verdict(total_score: float, bank_credits_annual: Optional[float], loan_requested: Optional[float]) -> Dict:
+def determine_verdict(final_score: float, bank_credits_annual: Optional[float], loan_requested: Optional[float]) -> Dict:
     """
     Determine verdict and loan terms based on total score.
     Uses FORMULA-BASED interest rates (not fixed bands).
     
+    CRITICAL: Score > 70 = APPROVE, 50-70 = CONDITIONAL, < 50 = REJECT
+    
     Args:
-        total_score: Final weighted score (10-100)
+        final_score: Final weighted score (10-100)
         bank_credits_annual: Annual bank inflows in ₹ Crores
         loan_requested: Requested loan amount in ₹ Crores
         
     Returns:
         Dict with verdict, loan_amount, interest_rate
     """
-    if total_score > 70:
+    # CRITICAL FIX: Ensure proper comparison logic
+    if final_score >= 70.0:  # Changed from > to >= to handle edge case
         # APPROVE
         if bank_credits_annual and loan_requested:
             loan_amount = min(bank_credits_annual * 3.5, loan_requested)
@@ -975,7 +978,8 @@ def determine_verdict(total_score: float, bank_credits_annual: Optional[float], 
             loan_amount = loan_requested
         
         # Formula: 10.5% + (70 - score) * 0.1
-        interest_rate = 10.5 + ((70 - total_score) * 0.1)
+        # For scores >= 70, this gives rates <= 10.5%
+        interest_rate = max(6.0, 10.5 + ((70 - final_score) * 0.1))  # Floor at 6%
         
         return {
             "verdict": Verdict.APPROVE,
@@ -983,7 +987,7 @@ def determine_verdict(total_score: float, bank_credits_annual: Optional[float], 
             "interest_rate": f"{interest_rate:.2f}% p.a."
         }
     
-    elif total_score >= 50:
+    elif final_score >= 50.0:
         # CONDITIONAL APPROVE
         if bank_credits_annual and loan_requested:
             loan_amount = min(bank_credits_annual * 2.0, loan_requested)
@@ -991,7 +995,7 @@ def determine_verdict(total_score: float, bank_credits_annual: Optional[float], 
             loan_amount = loan_requested * 0.7 if loan_requested else None
         
         # Formula: 10.5% + (70 - score) * 0.15
-        interest_rate = 10.5 + ((70 - total_score) * 0.15)
+        interest_rate = 10.5 + ((70 - final_score) * 0.15)
         
         return {
             "verdict": Verdict.CONDITIONAL,
@@ -1000,7 +1004,7 @@ def determine_verdict(total_score: float, bank_credits_annual: Optional[float], 
         }
     
     else:
-        # REJECT
+        # REJECT (score < 50)
         return {
             "verdict": Verdict.REJECT,
             "loan_amount": None,
@@ -1032,9 +1036,9 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
     gst_flags = []
     if company_data.financials:
         # Check for GST circular trading
-        if company_data.financials.gst_turnover and company_data.financials.bank_credits_annual:
-            gst_gap = ((company_data.financials.gst_turnover - company_data.financials.bank_credits_annual) 
-                      / company_data.financials.gst_turnover * 100)
+        if company_data.financials.gst_turnover_annual and company_data.financials.bank_credits_annual:
+            gst_gap = ((company_data.financials.gst_turnover_annual - company_data.financials.bank_credits_annual) 
+                      / company_data.financials.gst_turnover_annual * 100)
             
             if gst_gap >= 35:
                 gst_flags.append(create_flag(
@@ -1102,7 +1106,7 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
     all_flags.extend(cond_flags)
     
     # Calculate weighted total score
-    total_score = (
+    final_score = (
         character_score * 0.25 +
         capacity_score * 0.30 +
         capital_score * 0.20 +
@@ -1111,19 +1115,19 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
     )
     
     # Apply floor and ceiling
-    total_score = apply_floor_ceiling(total_score, 10.0, 100.0)
+    final_score = apply_floor_ceiling(final_score, 10.0, 100.0)
     
     # Round to 1 decimal place
-    total_score = round(total_score, 1)
+    final_score = round(final_score, 1)
     
     # Determine verdict and loan terms
     bank_credits = company_data.financials.bank_credits_annual if company_data.financials else None
     loan_requested = company_data.financials.loan_requested if company_data.financials else None
-    verdict_data = determine_verdict(total_score, bank_credits, loan_requested)
+    verdict_data = determine_verdict(final_score, bank_credits, loan_requested)
     
     # Generate reasoning
     reasoning = generate_reasoning(
-        total_score,
+        final_score,
         character_score,
         capacity_score,
         capital_score,
@@ -1152,7 +1156,7 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
         capital_score=round(capital_score, 1),
         collateral_score=round(collateral_score, 1),
         conditions_score=round(conditions_score, 1),
-        total_score=total_score,
+        final_score=final_score,
         verdict=verdict_data["verdict"],
         loan_amount=verdict_data["loan_amount"],
         interest_rate=verdict_data["interest_rate"],
@@ -1177,8 +1181,8 @@ def validate_scorer_with_ilfs():
     # IL&FS hardcoded data
     ilfs_financials = FinancialData(
         # Revenue and profitability
-        revenue_history=[8500.0, 9200.0, 9800.0],  # Declining
-        net_profit_history=[-5000.0, -3000.0, 500.0],
+        revenue=[8500.0, 9200.0, 9800.0],  # Declining
+        net_profit=[-5000.0, -3000.0, 500.0],
         ebitda=1200.0,
         
         # Debt servicing
@@ -1187,7 +1191,7 @@ def validate_scorer_with_ilfs():
         total_debt=91000.0,
         
         # Balance sheet
-        net_worth_history=[-15000.0, -8000.0, 5000.0],  # Negative
+        net_worth=[-15000.0, -8000.0, 5000.0],  # Negative
         current_ratio=0.6,
         debt_equity_ratio=7.8,  # Excessive
         
@@ -1196,12 +1200,12 @@ def validate_scorer_with_ilfs():
         promoter_pledge_pct=72.0,  # Very high
         
         # Banking conduct
-        cheque_bounces_12m=9,  # High
-        od_utilization_pct=94.0,  # Overextended
+        cheque_bounces_count=9,  # High
+        od_utilization_percent=94.0,  # Overextended
         bank_credits_annual=3680.0,
         
         # GST data (56.7% gap for circular trading signal)
-        gst_turnover=8500.0,
+        gst_turnover_annual=8500.0,
         gstr_3b_itc=850.0,
         gstr_2a_itc=820.0,
         

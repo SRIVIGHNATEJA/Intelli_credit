@@ -39,7 +39,7 @@ def test_demo_cache_fallback():
         company_data, score_result = result
         print(f"   ✓ PASS: Loaded {company_data.company_name}")
         print(f"   Verdict: {score_result.verdict.value}")
-        print(f"   Score: {score_result.total_score:.1f}")
+        print(f"   Score: {score_result.final_score:.1f}")
     else:
         print("   ⚠ Cache not yet generated (expected before Task 18)")
     

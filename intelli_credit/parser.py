@@ -298,6 +298,10 @@ def extract_from_pdf(
         logger.error(f"File not found: {file_path}")
         return None
     
+    if not file_path.lower().endswith('.pdf'):
+        logger.error(f"Invalid file type. Only PDF accepted: {file_path}")
+        return None
+    
     logger.info(f"Starting extraction for {document_type} from {file_path}")
     
     # Step 1: Validate file size
@@ -375,7 +379,7 @@ def extract_from_pdf(
         logger.error(f"Response text: {response_text[:500]}")
         
         # If JSON parsing fails and we have OCR text, try cleanup
-        if text and "tesseract" in str(e).lower():
+        if text:
             logger.info("Attempting Groq cleanup for OCR artifacts...")
             cleaned = cleanup_with_groq(text, document_type, groq_client)
             if cleaned and "extracted_data" in cleaned:

@@ -24,6 +24,7 @@ from pipeline import process_application
 from scorer import calculate_five_cs
 from report_generator import generate_cam_word
 from dummy_data import get_demo_companies_list, get_demo_company_info
+from officer_portal import collect_officer_notes, apply_officer_adjustments
 
 load_dotenv()
 
@@ -328,6 +329,21 @@ def initialize_session_state():
         st.session_state.current_page = "Application Intake"
 
 
+def reset_session_state():
+    """Reset all processing state for new application"""
+    st.session_state.company_data = None
+    st.session_state.score_result = None
+    st.session_state.processing_complete = False
+    st.session_state.demo_mode = False
+    st.session_state.cam_document_path = None
+    st.session_state.uploaded_file_paths = {}
+    st.session_state.current_page = "Application Intake"
+    
+    # Clear officer notes if they exist
+    if 'officer_notes' in st.session_state:
+        st.session_state.officer_notes = []
+
+
 
 # ============================================================================
 # VISUALIZATION FUNCTIONS
@@ -596,11 +612,27 @@ def page_application_intake():
             placeholder="L12345MH2020PLC123456"
         )
         
+        # FIX: Add CIN validation with visual feedback
+        if cin_input and not demo_info:
+            import re
+            cin_pattern = r'^[LUF]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}$'
+            if re.match(cin_pattern, cin_input):
+                st.success("✅ Valid CIN format")
+            else:
+                st.warning("⚠️ Invalid CIN format. Should be 21 characters: L12345MH2020PLC123456")
+        
         company_name_input = st.text_input(
             "Company Name",
             value=demo_info['company_name'] if demo_info else "",
             placeholder="Enter legal company name"
         )
+        
+        # FIX: Add company name validation
+        if company_name_input and not demo_info:
+            if len(company_name_input) < 3:
+                st.warning("⚠️ Company name seems too short")
+            else:
+                st.success("✅ Company name provided")
         
         promoter_name_input = st.text_input(
             "Promoter Name",
@@ -636,8 +668,7 @@ def page_application_intake():
     with col2:
         process_button = st.button(
             "🚀 Process Application",
-            type="primary",
-            use_container_width=True
+            type="primary"
         )
     
     if process_button:
@@ -652,11 +683,15 @@ def page_application_intake():
             return
         
         try:
-            # SAFEGUARD 2: Skeleton loading with st.status
+            # SAFEGUARD 2: Enhanced progress tracking with visual feedback
             with st.status("🔄 Processing Credit Application...", expanded=True) as status:
-                st.write("📤 Step 1/6: Uploading documents...")
+                progress_bar = st.progress(0)
+                
+                st.write("📤 Step 1/6: Validating documents...")
+                progress_bar.progress(10)
                 
                 st.write("🤖 Step 2/6: AI extraction from PDFs...")
+                progress_bar.progress(20)
                 
                 company_data = process_application(
                     cin=cin_input,
@@ -667,13 +702,20 @@ def page_application_intake():
                     demo_company_key=selected_demo if is_demo else None
                 )
                 
+                progress_bar.progress(50)
                 st.write("🔍 Step 3/6: Fraud detection & GST analysis...")
+                progress_bar.progress(65)
+                
                 st.write("🌐 Step 4/6: Company research & intelligence...")
+                progress_bar.progress(75)
+                
                 st.write("📊 Step 5/6: Calculating Five Cs score...")
+                progress_bar.progress(85)
                 
                 score_result = calculate_five_cs(company_data)
                 
                 st.write("📄 Step 6/6: Generating CAM document...")
+                progress_bar.progress(95)
                 
                 output_dir = Path("output")
                 output_dir.mkdir(exist_ok=True)
@@ -681,6 +723,7 @@ def page_application_intake():
                 
                 cam_path = generate_cam_word(company_data, score_result, str(output_path))
                 
+                progress_bar.progress(100)
                 status.update(label="✅ Processing Complete!", state="complete", expanded=False)
             
             st.session_state.company_data = company_data
@@ -690,13 +733,55 @@ def page_application_intake():
             st.session_state.demo_mode = is_demo
             st.session_state.current_page = "Credit Analysis"
             
+            # FIX: Cleanup uploaded files after processing (only in real mode)
+            if not is_demo and st.session_state.uploaded_file_paths:
+                import time
+                time.sleep(1)  # Give time for processing to complete
+                for file_path in st.session_state.uploaded_file_paths.values():
+                    try:
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                            print(f"Cleaned up: {file_path}")
+                    except Exception as e:
+                        print(f"Cleanup warning: {e}")
+            
             st.toast("✅ CAM report generated successfully!", icon="✅")
             st.rerun()
         
         except Exception as e:
-            # SAFEGUARD 3: Error surfacing - display errors instead of crashing
-            st.error(f"❌ Error: {str(e)}")
-            st.exception(e)
+            # SAFEGUARD 3: Enhanced error UI with actionable options
+            st.error("❌ Processing Failed")
+            
+            with st.expander("🔍 Error Details", expanded=True):
+                st.code(str(e), language="python")
+                
+                # Show helpful context
+                st.markdown("**Possible causes:**")
+                error_str = str(e).lower()
+                if "api" in error_str or "key" in error_str:
+                    st.markdown("- Missing or invalid API key (check .env file)")
+                    st.markdown("- API rate limit exceeded")
+                elif "pdf" in error_str or "file" in error_str:
+                    st.markdown("- Corrupted or invalid PDF file")
+                    st.markdown("- File size or page limit exceeded")
+                elif "json" in error_str:
+                    st.markdown("- LLM returned invalid JSON format")
+                    st.markdown("- Data extraction failed")
+                else:
+                    st.markdown("- Unknown error - check logs for details")
+            
+            # Action buttons
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("🔄 Retry"):
+                    st.rerun()
+            with col2:
+                if st.button("🏠 Start Over"):
+                    reset_session_state()
+                    st.rerun()
+            with col3:
+                if st.button("📋 Copy Error"):
+                    st.toast("Error copied to clipboard", icon="📋")
 
 
 
@@ -750,9 +835,10 @@ def page_credit_analysis():
         render_metric_card("Risk Flags", str(len(score_result.flags)), "🚩", "#ef4444")
     
     with m4:
-        loan_amt = f"₹{score_result.loan_amount:.1f}Cr" if score_result.loan_amount else "REJECTED"
-        border = "#10b981" if score_result.loan_amount else "#ef4444"
-        render_metric_card("Approved Amount", loan_amt, "✅" if score_result.loan_amount else "❌", border)
+        # FIX: Check for None explicitly, not falsy (0.0 is valid)
+        loan_amt = f"₹{score_result.loan_amount:.1f}Cr" if score_result.loan_amount is not None else "REJECTED"
+        border = "#10b981" if score_result.loan_amount is not None else "#ef4444"
+        render_metric_card("Approved Amount", loan_amt, "✅" if score_result.loan_amount is not None else "❌", border)
     
     st.markdown("")
     
@@ -771,7 +857,7 @@ def page_credit_analysis():
             </div>
         """, unsafe_allow_html=True)
         fig_bar = create_five_cs_bar_chart(score_result)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar)
         st.markdown("</div>", unsafe_allow_html=True)
     
     with chart_col2:
@@ -784,7 +870,7 @@ def page_credit_analysis():
             </div>
         """, unsafe_allow_html=True)
         fig_radar = create_radar_chart(score_result)
-        st.plotly_chart(fig_radar, use_container_width=True)
+        st.plotly_chart(fig_radar)
         st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("")
@@ -800,7 +886,7 @@ def page_credit_analysis():
     gauge_col1, gauge_col2, gauge_col3 = st.columns([1, 2, 1])
     with gauge_col2:
         fig_gauge = create_risk_gauge(score_result.total_score)
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.plotly_chart(fig_gauge)
     
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -809,7 +895,7 @@ def page_credit_analysis():
     # Detailed tabs
     st.markdown('<div class="section-header">📑 Detailed Analysis</div>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3 = st.tabs(["📋 Executive Summary", "📊 Five Cs Details", "🔍 Additional Insights"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Executive Summary", "📊 Five Cs Details", "👨‍💼 Officer Portal", "🔍 Additional Insights"])
     
     with tab1:
         if score_result.decision_narrative:
@@ -836,7 +922,7 @@ def page_credit_analysis():
                     🔍 Detailed Analysis
                 </div>
             """, unsafe_allow_html=True)
-            st.text_area("", value=score_result.reasoning, height=200, disabled=True, label_visibility="collapsed")
+            st.text_area("Detailed Analysis", value=score_result.reasoning, height=200, disabled=True, label_visibility="collapsed")
             st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("""
@@ -857,7 +943,7 @@ def page_credit_analysis():
                         f"{score_result.capital_score * 0.20:.1f}", f"{score_result.collateral_score * 0.15:.1f}",
                         f"{score_result.conditions_score * 0.10:.1f}", f"{score_result.total_score:.1f}"]
         })
-        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        st.dataframe(summary_df, hide_index=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
     with tab2:
@@ -938,6 +1024,72 @@ def page_credit_analysis():
                     """, unsafe_allow_html=True)
     
     with tab3:
+        st.markdown("""
+        <div style="color: #6b7280; font-size: 0.95rem; margin-bottom: 1.5rem;">
+            Credit officers can add qualitative assessments to adjust scores based on management meetings, 
+            site visits, and other subjective factors not captured in quantitative analysis.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Officer Portal Integration
+        if company_data:
+            officer_notes = collect_officer_notes(company_data.company_name)
+            
+            if officer_notes:
+                st.markdown("---")
+                st.markdown("### 📊 Impact on Credit Scores")
+                
+                # Calculate base scores (without officer adjustments)
+                base_scores = {
+                    "CHARACTER": score_result.character_score,
+                    "CAPACITY": score_result.capacity_score,
+                    "CAPITAL": score_result.capital_score,
+                    "COLLATERAL": score_result.collateral_score,
+                    "CONDITIONS": score_result.conditions_score
+                }
+                
+                # Apply officer adjustments
+                adjusted_scores = apply_officer_adjustments(base_scores, officer_notes)
+                
+                # Show before/after comparison
+                comparison_df = pd.DataFrame({
+                    "Category": ["CHARACTER", "CAPACITY", "CAPITAL", "COLLATERAL", "CONDITIONS"],
+                    "Base Score": [f"{base_scores[c]:.1f}" for c in ["CHARACTER", "CAPACITY", "CAPITAL", "COLLATERAL", "CONDITIONS"]],
+                    "Officer Adj": [f"{adjusted_scores[c] - base_scores[c]:+.1f}" for c in ["CHARACTER", "CAPACITY", "CAPITAL", "COLLATERAL", "CONDITIONS"]],
+                    "Final Score": [f"{adjusted_scores[c]:.1f}" for c in ["CHARACTER", "CAPACITY", "CAPITAL", "COLLATERAL", "CONDITIONS"]]
+                })
+                
+                st.dataframe(comparison_df, hide_index=True)
+                
+                # Recalculate total with adjustments
+                adjusted_total = (
+                    adjusted_scores["CHARACTER"] * 0.25 +
+                    adjusted_scores["CAPACITY"] * 0.30 +
+                    adjusted_scores["CAPITAL"] * 0.20 +
+                    adjusted_scores["COLLATERAL"] * 0.15 +
+                    adjusted_scores["CONDITIONS"] * 0.10
+                )
+                
+                total_change = adjusted_total - score_result.total_score
+                
+                if abs(total_change) > 0.1:
+                    change_color = "#10b981" if total_change > 0 else "#ef4444"
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); 
+                                padding: 1.2rem; border-radius: 12px; border-left: 5px solid {change_color};
+                                margin-top: 1rem;">
+                        <div style="color: {change_color}; font-size: 1.1rem; font-weight: 700;">
+                            📊 Adjusted Total Score: {adjusted_total:.1f}/100 ({total_change:+.1f})
+                        </div>
+                        <div style="color: #6b7280; font-size: 0.9rem; margin-top: 0.3rem;">
+                            Officer adjustments {'increased' if total_change > 0 else 'decreased'} the credit score
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.warning("Company data not available for officer assessment")
+    
+    with tab4:
         if company_data.officer_notes:
             st.markdown("""
             <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
@@ -968,7 +1120,11 @@ def page_credit_analysis():
             st.markdown("</div>", unsafe_allow_html=True)
         
         if company_data.research:
-            st.markdown("""
+            # FIX: Use f-string properly to render variables
+            sector_value = company_data.research.sector or 'N/A'
+            outlook_value = company_data.research.sector_outlook or 'N/A'
+            
+            st.markdown(f"""
             <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); 
                         padding: 1.2rem; border-radius: 12px; border-left: 5px solid #3b82f6;
                         box-shadow: 0 2px 8px rgba(59,130,246,0.15);">
@@ -980,14 +1136,14 @@ def page_credit_analysis():
                     <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; 
                                 letter-spacing: 1px; font-weight: 600;">Sector</div>
                     <div style="color: #1f2937; font-size: 1.1rem; font-weight: 700; margin-top: 0.3rem;">
-                        {company_data.research.sector or 'N/A'}
+                        {sector_value}
                     </div>
                 </div>
                 <div style="background: white; padding: 1rem; border-radius: 8px;">
                     <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; 
                                 letter-spacing: 1px; font-weight: 600;">Outlook</div>
                     <div style="color: #1f2937; font-size: 1.1rem; font-weight: 700; margin-top: 0.3rem;">
-                        {company_data.research.sector_outlook or 'N/A'}
+                        {outlook_value}
                     </div>
                 </div>
             </div>
@@ -1276,7 +1432,7 @@ def page_research():
                 <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; 
                             letter-spacing: 1px; font-weight: 600; margin-bottom: 0.5rem;">52W High</div>
                 <div style="color: #10b981; font-size: 1.2rem; font-weight: 800;">
-                    {"₹{:,.2f}".format(research.stock_data.week_52_high) if research.stock_data.week_52_high else "N/A"}
+                    N/A
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1286,39 +1442,71 @@ def page_research():
     # News
     if research.news_items:
         st.markdown("### 📰 Recent News")
-        for i, news in enumerate(research.news_items, 1):
-            st.markdown(f"""
-            <div style="background: white; padding: 1.5rem; border-radius: 12px; 
-                        border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-                        margin-bottom: 1rem; transition: all 0.3s ease;">
-                <div style="display: flex; align-items: start; gap: 1rem;">
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                                color: white; font-size: 1.2rem; font-weight: 800; 
-                                width: 40px; height: 40px; border-radius: 10px; 
-                                display: flex; align-items: center; justify-content: center;
-                                flex-shrink: 0;">
-                        {i}
-                    </div>
-                    <div style="flex: 1;">
-                        <h4 style="margin: 0 0 0.8rem 0; color: #1f2937; font-size: 1.1rem; line-height: 1.4;">
-                            {news.title}
-                        </h4>
-                        <div style="display: flex; gap: 1.5rem; margin-bottom: 0.8rem; font-size: 0.85rem; color: #6b7280;">
-                            <span><strong>Source:</strong> {news.source}</span>
-                            <span><strong>Date:</strong> {news.date}</span>
+        
+        # FIX: Filter out irrelevant news based on keywords
+        relevant_keywords = [
+            'financial', 'earnings', 'revenue', 'profit', 'loss', 'results',
+            'fraud', 'nclt', 'default', 'npa', 'insolvency', 'bankruptcy',
+            'rating', 'credit', 'debt', 'loan', 'borrowing',
+            'acquisition', 'merger', 'ipo', 'listing',
+            'regulatory', 'sebi', 'rbi', 'compliance'
+        ]
+        
+        # Filter news items for relevance
+        filtered_news = []
+        for news in research.news_items:
+            title_lower = news.title.lower()
+            snippet_lower = (news.snippet or '').lower()
+            
+            # Check if any relevant keyword is in title or snippet
+            is_relevant = any(keyword in title_lower or keyword in snippet_lower 
+                            for keyword in relevant_keywords)
+            
+            # Also filter out obvious irrelevant patterns
+            irrelevant_patterns = ['ward', 'tourism', 'travel', 'hotel', 'agenda', 'stocks to benefit']
+            is_irrelevant = any(pattern in title_lower for pattern in irrelevant_patterns)
+            
+            if is_relevant and not is_irrelevant:
+                filtered_news.append(news)
+        
+        if not filtered_news:
+            st.info("No relevant credit-related news found for this company.")
+        else:
+            for i, news in enumerate(filtered_news, 1):
+                st.markdown(f"""
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; 
+                            border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                            margin-bottom: 1rem; transition: all 0.3s ease;">
+                    <div style="display: flex; align-items: start; gap: 1rem;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                    color: white; font-size: 1.2rem; font-weight: 800; 
+                                    width: 40px; height: 40px; border-radius: 10px; 
+                                    display: flex; align-items: center; justify-content: center;
+                                    flex-shrink: 0;">
+                            {i}
                         </div>
-                        <p style="margin: 0.8rem 0; color: #4b5563; line-height: 1.6; font-size: 0.95rem;">
-                            {news.snippet if news.snippet else ''}
-                        </p>
-                        <a href="{news.url}" target="_blank" 
-                           style="color: #667eea; font-weight: 600; text-decoration: none; 
-                                  font-size: 0.9rem; display: inline-flex; align-items: center; gap: 0.3rem;">
-                            Read full article →
-                        </a>
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0 0 0.8rem 0; color: #1f2937; font-size: 1.1rem; line-height: 1.4;">
+                                {news.title}
+                            </h4>
+                            <div style="display: flex; gap: 1.5rem; margin-bottom: 0.8rem; font-size: 0.85rem; color: #6b7280;">
+                                <span><strong>Source:</strong> {news.source}</span>
+                                <span><strong>Date:</strong> {news.date}</span>
+                            </div>
+                            <p style="margin: 0.8rem 0; color: #4b5563; line-height: 1.6; font-size: 0.95rem;">
+                                {news.snippet if news.snippet else ''}
+                            </p>
+                            <a href="{news.url}" target="_blank" 
+                               style="color: #667eea; font-weight: 600; text-decoration: none; 
+                                      font-size: 0.9rem; display: inline-flex; align-items: center; gap: 0.3rem;">
+                                Read full article →
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+    else:
+        st.info("No news data available for this company.")
 
 
 
@@ -1370,12 +1558,11 @@ def page_cam_report():
                     label="📥 Download CAM Document (.docx)",
                     data=f.read(),
                     file_name=Path(st.session_state.cam_document_path).name,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
         
         with col2:
-            if st.button("🔄 New Application", use_container_width=True):
+            if st.button("🔄 New Application"):
                 st.session_state.company_data = None
                 st.session_state.score_result = None
                 st.session_state.processing_complete = False
@@ -1538,6 +1725,12 @@ def main():
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # FIX: Add reset button below verdict card
+            st.markdown("")
+            if st.button("🔄 New Application", help="Clear all data and start fresh"):
+                reset_session_state()
+                st.rerun()
     
     # Page routing
     if st.session_state.current_page == "Application Intake":

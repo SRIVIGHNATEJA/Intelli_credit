@@ -1,0 +1,239 @@
+{
+  "company_data": {
+    "cin": "L65990MH1987PLC044571",
+    "company_name": "Infrastructure Leasing and Financial Services Limited",
+    "promoter_name": "Promoter of Infrastructure Leasing and Financial Services Limited",
+    "financials": {
+      "revenue": [
+        8500.0,
+        12000.0,
+        15000.0
+      ],
+      "net_profit": [
+        -2500.0,
+        -1800.0,
+        500.0
+      ],
+      "ebitda": -1200.0,
+      "dscr": 0.58,
+      "interest_coverage": 0.45,
+      "total_debt": 91000.0,
+      "net_worth": [
+        -15000.0,
+        -8000.0,
+        5000.0
+      ],
+      "current_ratio": 0.85,
+      "debt_equity_ratio": 7.8,
+      "promoter_contribution_pct": 8.0,
+      "promoter_pledge_pct": 72.0,
+      "cheque_bounces_count": 9,
+      "od_utilization_percent": 94.0,
+      "bank_credits_annual": 25000.0,
+      "gst_turnover_annual": 8500.0,
+      "gstr_3b_itc": 850.0,
+      "gstr_2a_itc": 750.0,
+      "collateral_value": 45000.0,
+      "collateral_type": "Property",
+      "guarantee_type": "Corporate",
+      "loan_requested": 1000.0,
+      "audit_opinion": "Qualified",
+      "going_concern_flag": true,
+      "nclt_cases": 1,
+      "drt_cases": 0,
+      "criminal_cases": 0,
+      "sebi_actions": 0,
+      "ed_actions": 0,
+      "mca_status": "Active",
+      "din_deactivated": false,
+      "credit_rating": "D",
+      "rating_downgrade_months": 6
+    },
+    "research": {
+      "sector": "Infrastructure Finance",
+      "sector_outlook": "DISTRESSED",
+      "sector_npa_rate": 18.4,
+      "news_items": [
+        {
+          "title": "IL&FS Crisis: NCLT Admits Company for Insolvency Resolution",
+          "source": "Economic Times",
+          "date": "2023-09-15",
+          "url": "https://economictimes.indiatimes.com/news/ilfs-crisis",
+          "snippet": "Infrastructure Leasing and Financial Services faces severe liquidity crisis..."
+        },
+        {
+          "title": "IL&FS Default Triggers Broader NBFC Concerns",
+          "source": "Business Standard",
+          "date": "2023-08-22",
+          "url": "https://business-standard.com/ilfs-default",
+          "snippet": "The company's default on commercial paper has raised concerns..."
+        },
+        {
+          "title": "Government Intervenes in IL&FS Resolution Process",
+          "source": "Mint",
+          "date": "2023-07-10",
+          "url": "https://livemint.com/ilfs-resolution",
+          "snippet": "Ministry of Corporate Affairs takes control of the board..."
+        }
+      ],
+      "mca_status": "Active",
+      "stock_data": {
+        "ticker": null,
+        "current_price": null,
+        "market_cap": null,
+        "is_listed": false
+      },
+      "validation_status": "POTENTIAL_MATCH"
+    },
+    "officer_notes": [
+      {
+        "note_text": "Company has significant exposure to stalled infrastructure projects. Management quality deteriorated post-crisis.",
+        "affected_c": "CHARACTER",
+        "adjustment": -5.0,
+        "timestamp": "2026-03-10T13:00:47.949884"
+      },
+      {
+        "note_text": "Cash flow generation severely impacted by asset-liability mismatch. Recovery prospects uncertain.",
+        "affected_c": "CAPACITY",
+        "adjustment": -8.0,
+        "timestamp": "2026-03-10T13:00:47.949909"
+      },
+      {
+        "note_text": "Asset quality concerns due to NPAs in subsidiary portfolio. Collateral may not cover exposure.",
+        "affected_c": "COLLATERAL",
+        "adjustment": -3.0,
+        "timestamp": "2026-03-10T13:00:47.949912"
+      }
+    ],
+    "early_warnings": [],
+    "processing_timestamp": "2026-03-10T13:00:47.949922",
+    "demo_mode": true
+  },
+  "score_result": {
+    "character_score": 10.0,
+    "capacity_score": 10.0,
+    "capital_score": 10.0,
+    "collateral_score": 100.0,
+    "conditions_score": 20.0,
+    "final_score": 24.5,
+    "verdict": "REJECT",
+    "loan_amount": null,
+    "interest_rate": null,
+    "flags": [
+      {
+        "category": "CHARACTER",
+        "severity": "MEDIUM",
+        "description": "1 NCLT case(s) found",
+        "source": "Legal Records",
+        "impact_score": -10
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "MEDIUM",
+        "description": "Rating downgraded 6 months ago",
+        "source": "Credit Rating Agency",
+        "impact_score": -15.0
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "HIGH",
+        "description": "Going concern flag raised by auditor",
+        "source": "Audit Report",
+        "impact_score": -20.0
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "MEDIUM",
+        "description": "Qualified audit opinion",
+        "source": "Audit Report",
+        "impact_score": -20.0
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "HIGH",
+        "description": "High promoter pledge: 72.0%",
+        "source": "Stock Exchange Filing",
+        "impact_score": -40.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "DSCR 0.58 (insufficient coverage)",
+        "source": "Financial Statements",
+        "impact_score": -40.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "Two consecutive years of revenue decline",
+        "source": "Financial Statements",
+        "impact_score": -35.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "9 cheque bounces in 12 months",
+        "source": "Bank Statements",
+        "impact_score": -40.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "OD utilization 94.0% (overextended)",
+        "source": "Bank Statements",
+        "impact_score": -25.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "HIGH",
+        "description": "D/E ratio 7.80 (excessive leverage)",
+        "source": "Financial Statements",
+        "impact_score": -45.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "HIGH",
+        "description": "Negative net worth: ₹-15000.00 Cr",
+        "source": "Financial Statements",
+        "impact_score": -50.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "HIGH",
+        "description": "Promoter contribution 8.0% (very low)",
+        "source": "Financial Statements",
+        "impact_score": -35.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "HIGH",
+        "description": "Promoter pledge 72.0% (high distress signal)",
+        "source": "Stock Exchange Filing",
+        "impact_score": -40.0
+      },
+      {
+        "category": "COLLATERAL",
+        "severity": "GREEN",
+        "description": "Corporate guarantee provided",
+        "source": "Guarantee Documents",
+        "impact_score": 10.0
+      },
+      {
+        "category": "CONDITIONS",
+        "severity": "HIGH",
+        "description": "Sector outlook: DISTRESSED",
+        "source": "Market Research",
+        "impact_score": -30.0
+      },
+      {
+        "category": "CONDITIONS",
+        "severity": "HIGH",
+        "description": "Sector NPA rate: 18.4% (high risk)",
+        "source": "RBI Sector Data",
+        "impact_score": -20.0
+      }
+    ],
+    "reasoning": "Total Credit Score: 24.5/100\n\nComponent Scores:\n  CHARACTER (25%): 10.0/100\n  CAPACITY (30%): 10.0/100\n  CAPITAL (20%): 10.0/100\n  COLLATERAL (15%): 100.0/100\n  CONDITIONS (10%): 20.0/100\n\nKey Findings:\n  [GREEN] Corporate guarantee provided (Source: Guarantee Documents)\n  [MEDIUM] Qualified audit opinion (Source: Audit Report)\n  [MEDIUM] Rating downgraded 6 months ago (Source: Credit Rating Agency)\n  [MEDIUM] 1 NCLT case(s) found (Source: Legal Records)\n  [HIGH] Negative net worth: ₹-15000.00 Cr (Source: Financial Statements)",
+    "decision_narrative": "Key factors: Corporate guarantee provided; Qualified audit opinion; Rating downgraded 6 months ago"
+  }
+}

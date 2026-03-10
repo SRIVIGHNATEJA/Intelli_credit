@@ -1,0 +1,260 @@
+{
+  "company_data": {
+    "cin": "U80903KA2011PTC061427",
+    "company_name": "Think & Learn Private Limited",
+    "promoter_name": "Promoter of Think & Learn Private Limited",
+    "financials": {
+      "revenue": [
+        2200.0,
+        2800.0,
+        2400.0
+      ],
+      "net_profit": [
+        -1800.0,
+        -1200.0,
+        -800.0
+      ],
+      "ebitda": -900.0,
+      "dscr": 0.35,
+      "interest_coverage": 0.2,
+      "total_debt": 8500.0,
+      "net_worth": [
+        -2500.0,
+        -800.0,
+        1200.0
+      ],
+      "current_ratio": 0.65,
+      "debt_equity_ratio": 12.5,
+      "promoter_contribution_pct": 15.0,
+      "promoter_pledge_pct": 85.0,
+      "cheque_bounces_count": 12,
+      "od_utilization_percent": 98.0,
+      "bank_credits_annual": 3500.0,
+      "gst_turnover_annual": 2200.0,
+      "gstr_3b_itc": 330.0,
+      "gstr_2a_itc": 250.0,
+      "collateral_value": 1500.0,
+      "collateral_type": "Receivables",
+      "guarantee_type": "Personal",
+      "loan_requested": 800.0,
+      "audit_opinion": "Qualified",
+      "going_concern_flag": true,
+      "nclt_cases": 0,
+      "drt_cases": 2,
+      "criminal_cases": 0,
+      "sebi_actions": 1,
+      "ed_actions": 0,
+      "mca_status": "Active",
+      "din_deactivated": false,
+      "credit_rating": "BB-",
+      "rating_downgrade_months": 3
+    },
+    "research": {
+      "sector": "Education Technology",
+      "sector_outlook": "DECLINING",
+      "sector_npa_rate": 12.3,
+      "news_items": [
+        {
+          "title": "Byju's Faces Funding Crunch, Delays Employee Salaries",
+          "source": "Economic Times",
+          "date": "2023-10-01",
+          "url": "https://economictimes.indiatimes.com/byjus-funding",
+          "snippet": "The edtech giant is struggling with cash flow issues..."
+        },
+        {
+          "title": "Byju's Valuation Drops to $5.1 Billion from Peak of $22 Billion",
+          "source": "Business Standard",
+          "date": "2023-09-18",
+          "url": "https://business-standard.com/byjus-valuation",
+          "snippet": "Investors mark down the company's valuation significantly..."
+        },
+        {
+          "title": "Byju's Faces Regulatory Scrutiny Over Business Practices",
+          "source": "Mint",
+          "date": "2023-08-30",
+          "url": "https://livemint.com/byjus-regulatory",
+          "snippet": "Education ministry raises concerns about aggressive sales tactics..."
+        }
+      ],
+      "mca_status": "Active",
+      "stock_data": {
+        "ticker": null,
+        "current_price": null,
+        "market_cap": null,
+        "is_listed": false
+      },
+      "validation_status": "POTENTIAL_MATCH"
+    },
+    "officer_notes": [
+      {
+        "note_text": "Aggressive accounting practices and frequent auditor changes raise governance concerns.",
+        "affected_c": "CHARACTER",
+        "adjustment": -7.0,
+        "timestamp": "2026-03-10T13:00:47.952439"
+      },
+      {
+        "note_text": "Business model sustainability questioned due to high customer acquisition costs and churn.",
+        "affected_c": "CAPACITY",
+        "adjustment": -5.0,
+        "timestamp": "2026-03-10T13:00:47.952450"
+      },
+      {
+        "note_text": "Rapid expansion funded through debt has created significant leverage. Refinancing risk high.",
+        "affected_c": "CAPITAL",
+        "adjustment": -4.0,
+        "timestamp": "2026-03-10T13:00:47.952452"
+      }
+    ],
+    "early_warnings": [],
+    "processing_timestamp": "2026-03-10T13:00:47.952461",
+    "demo_mode": true
+  },
+  "score_result": {
+    "character_score": 10.0,
+    "capacity_score": 10.0,
+    "capital_score": 10.0,
+    "collateral_score": 60.0,
+    "conditions_score": 35.0,
+    "final_score": 20.0,
+    "verdict": "REJECT",
+    "loan_amount": null,
+    "interest_rate": null,
+    "flags": [
+      {
+        "category": "CHARACTER",
+        "severity": "MEDIUM",
+        "description": "2 DRT case(s) found",
+        "source": "Legal Records",
+        "impact_score": -20
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "HIGH",
+        "description": "SEBI enforcement action(s): 1",
+        "source": "Regulatory Records",
+        "impact_score": -20.0
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "MEDIUM",
+        "description": "Rating downgraded 3 months ago",
+        "source": "Credit Rating Agency",
+        "impact_score": -15.0
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "HIGH",
+        "description": "Going concern flag raised by auditor",
+        "source": "Audit Report",
+        "impact_score": -20.0
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "MEDIUM",
+        "description": "Qualified audit opinion",
+        "source": "Audit Report",
+        "impact_score": -20.0
+      },
+      {
+        "category": "CHARACTER",
+        "severity": "HIGH",
+        "description": "High promoter pledge: 85.0%",
+        "source": "Stock Exchange Filing",
+        "impact_score": -40.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "DSCR 0.35 (insufficient coverage)",
+        "source": "Financial Statements",
+        "impact_score": -40.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "Revenue declined 21.4%",
+        "source": "Financial Statements",
+        "impact_score": -25.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "12 cheque bounces in 12 months",
+        "source": "Bank Statements",
+        "impact_score": -40.0
+      },
+      {
+        "category": "CAPACITY",
+        "severity": "HIGH",
+        "description": "OD utilization 98.0% (overextended)",
+        "source": "Bank Statements",
+        "impact_score": -25.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "HIGH",
+        "description": "D/E ratio 12.50 (excessive leverage)",
+        "source": "Financial Statements",
+        "impact_score": -45.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "HIGH",
+        "description": "Negative net worth: ₹-2500.00 Cr",
+        "source": "Financial Statements",
+        "impact_score": -50.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "MEDIUM",
+        "description": "Promoter contribution 15.0% (low)",
+        "source": "Financial Statements",
+        "impact_score": -20.0
+      },
+      {
+        "category": "CAPITAL",
+        "severity": "HIGH",
+        "description": "Promoter pledge 85.0% (high distress signal)",
+        "source": "Stock Exchange Filing",
+        "impact_score": -40.0
+      },
+      {
+        "category": "COLLATERAL",
+        "severity": "MEDIUM",
+        "description": "Coverage ratio 1.41x (moderate)",
+        "source": "Collateral Valuation",
+        "impact_score": -20.0
+      },
+      {
+        "category": "COLLATERAL",
+        "severity": "HIGH",
+        "description": "Collateral type: Receivables (collection risk)",
+        "source": "Collateral Valuation",
+        "impact_score": -25.0
+      },
+      {
+        "category": "COLLATERAL",
+        "severity": "GREEN",
+        "description": "Personal guarantee provided",
+        "source": "Guarantee Documents",
+        "impact_score": 5.0
+      },
+      {
+        "category": "CONDITIONS",
+        "severity": "MEDIUM",
+        "description": "Sector outlook: DECLINING",
+        "source": "Market Research",
+        "impact_score": -15.0
+      },
+      {
+        "category": "CONDITIONS",
+        "severity": "HIGH",
+        "description": "Sector NPA rate: 12.3% (high risk)",
+        "source": "RBI Sector Data",
+        "impact_score": -20.0
+      }
+    ],
+    "reasoning": "Total Credit Score: 20.0/100\n\nComponent Scores:\n  CHARACTER (25%): 10.0/100\n  CAPACITY (30%): 10.0/100\n  CAPITAL (20%): 10.0/100\n  COLLATERAL (15%): 60.0/100\n  CONDITIONS (10%): 35.0/100\n\nKey Findings:\n  [GREEN] Personal guarantee provided (Source: Guarantee Documents)\n  [MEDIUM] 2 DRT case(s) found (Source: Legal Records)\n  [MEDIUM] Qualified audit opinion (Source: Audit Report)\n  [MEDIUM] Promoter contribution 15.0% (low) (Source: Financial Statements)\n  [MEDIUM] Coverage ratio 1.41x (moderate) (Source: Collateral Valuation)",
+    "decision_narrative": "Key factors: Personal guarantee provided; 2 DRT case(s) found; Qualified audit opinion"
+  }
+}

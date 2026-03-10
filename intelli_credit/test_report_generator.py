@@ -21,21 +21,21 @@ def test_ilfs_cam_generation():
     
     # IL&FS financial data
     ilfs_financials = FinancialData(
-        revenue_history=[8500.0, 9200.0, 9800.0],
-        net_profit_history=[-5000.0, -3000.0, 500.0],
+        revenue=[8500.0, 9200.0, 9800.0],
+        net_profit=[-5000.0, -3000.0, 500.0],
         ebitda=1200.0,
         dscr=0.58,
         interest_coverage=0.8,
         total_debt=91000.0,
-        net_worth_history=[-15000.0, -8000.0, 5000.0],
+        net_worth=[-15000.0, -8000.0, 5000.0],
         current_ratio=0.6,
         debt_equity_ratio=7.8,
         promoter_contribution_pct=8.0,
         promoter_pledge_pct=72.0,
-        cheque_bounces_12m=9,
-        od_utilization_pct=94.0,
+        cheque_bounces_count=9,
+        od_utilization_percent=94.0,
         bank_credits_annual=3680.0,
-        gst_turnover=8500.0,
+        gst_turnover_annual=8500.0,
         gstr_3b_itc=850.0,
         gstr_2a_itc=820.0,
         collateral_value=1200.0,
@@ -133,7 +133,7 @@ def test_ilfs_cam_generation():
     print(f"   CAPITAL: {score_result.capital_score:.1f}/100")
     print(f"   COLLATERAL: {score_result.collateral_score:.1f}/100")
     print(f"   CONDITIONS: {score_result.conditions_score:.1f}/100")
-    print(f"   TOTAL: {score_result.total_score:.1f}/100")
+    print(f"   TOTAL: {score_result.final_score:.1f}/100")
     print(f"   VERDICT: {score_result.verdict.value}")
     
     print(f"\n3. Generating decision narrative from top 3 flags...")

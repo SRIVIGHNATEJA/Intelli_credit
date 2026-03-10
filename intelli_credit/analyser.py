@@ -292,7 +292,7 @@ def cross_check_gst_bank(
     
     # Check 1: GST-Bank turnover mismatch
     mismatch_flag = check_gst_bank_mismatch(
-        gst_turnover=financials.gst_turnover,
+        gst_turnover=financials.gst_turnover_annual,
         bank_credits_annual=financials.bank_credits_annual
     )
     if mismatch_flag:
@@ -320,18 +320,42 @@ def cross_check_gst_bank(
 
 def format_currency(amount: Optional[float], unit: str = "Cr") -> str:
     """
-    Format currency amount for display.
+    Format currency amount for display in Indian notation.
     
     Args:
         amount: Amount in Crores
         unit: Unit suffix (default "Cr")
     
     Returns:
-        Formatted string like "₹123.45 Cr"
+        Formatted string like "₹1,23,45.67 Cr" in Indian notation
     """
     if amount is None:
         return "N/A"
-    return f"₹{amount:.2f} {unit}"
+    
+    # Format with Indian comma notation
+    amount_str = f"{amount:.2f}"
+    parts = amount_str.split('.')
+    integer_part = parts[0]
+    decimal_part = parts[1] if len(parts) > 1 else "00"
+    
+    # Apply Indian grouping (last 3 digits, then groups of 2)
+    if len(integer_part) > 3:
+        last_three = integer_part[-3:]
+        remaining = integer_part[:-3]
+        
+        # Group remaining digits in pairs from right to left
+        grouped = []
+        for i in range(len(remaining) - 1, -1, -2):
+            if i == 0:
+                grouped.append(remaining[0])
+            else:
+                grouped.append(remaining[max(0, i-1):i+1])
+        
+        indian_format = ','.join(reversed(grouped)) + ',' + last_three
+    else:
+        indian_format = integer_part
+    
+    return f"₹{indian_format}.{decimal_part} {unit}"
 
 
 def get_gst_summary(financials: FinancialData) -> Dict[str, Any]:
@@ -345,12 +369,12 @@ def get_gst_summary(financials: FinancialData) -> Dict[str, Any]:
         Dictionary with GST summary metrics
     """
     gap = calculate_gst_gap_percentage(
-        financials.gst_turnover,
+        financials.gst_turnover_annual,
         financials.bank_credits_annual
     )
     
     return {
-        "gst_turnover": format_currency(financials.gst_turnover),
+        "gst_turnover_annual": format_currency(financials.gst_turnover_annual),
         "bank_credits": format_currency(financials.bank_credits_annual),
         "gap_percentage": f"{gap:.1f}%" if gap is not None else "N/A",
         "gstr_3b_itc": format_currency(financials.gstr_3b_itc),

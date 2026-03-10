@@ -97,17 +97,20 @@ class FinancialData:
     All monetary values in ₹ Crores unless specified.
     """
     # Revenue and profitability
-    revenue_history: List[float] = field(default_factory=list)  # Last 3 years [current, -1, -2]
-    net_profit_history: List[float] = field(default_factory=list)
+    revenue: List[float] = field(default_factory=list)  # Last 3 years [current, -1, -2]
+    net_profit: List[float] = field(default_factory=list)
     ebitda: Optional[float] = None
+    finance_cost: Optional[float] = None
     
     # Debt servicing
     dscr: Optional[float] = None  # Debt Service Coverage Ratio
     interest_coverage: Optional[float] = None
     total_debt: Optional[float] = None
+    long_term_debt: Optional[float] = None
+    short_term_borrowings: Optional[float] = None
     
     # Balance sheet
-    net_worth_history: List[float] = field(default_factory=list)  # Last 3 years
+    net_worth: List[float] = field(default_factory=list)  # Last 3 years
     current_ratio: Optional[float] = None
     debt_equity_ratio: Optional[float] = None
     
@@ -116,14 +119,18 @@ class FinancialData:
     promoter_pledge_pct: Optional[float] = None  # % of shares pledged
     
     # Banking conduct
-    cheque_bounces_12m: int = 0
-    od_utilization_pct: Optional[float] = None  # Overdraft utilization %
+    cheque_bounces_count: int = 0
+    od_utilization_percent: Optional[float] = None  # Overdraft utilization %
     bank_credits_annual: Optional[float] = None  # Annual bank inflows
     
     # GST data
-    gst_turnover: Optional[float] = None
+    gst_turnover_annual: Optional[float] = None
     gstr_3b_itc: Optional[float] = None  # Input Tax Credit claimed
     gstr_2a_itc: Optional[float] = None  # ITC available
+    gst_bank_gap_percent: Optional[float] = None
+    
+    # Period information
+    period_months: Optional[int] = None
     
     # Collateral
     collateral_value: Optional[float] = None
@@ -155,23 +162,28 @@ class FinancialData:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
-            "revenue_history": self.revenue_history,
-            "net_profit_history": self.net_profit_history,
+            "revenue": self.revenue,
+            "net_profit": self.net_profit,
             "ebitda": self.ebitda,
+            "finance_cost": self.finance_cost,
             "dscr": self.dscr,
             "interest_coverage": self.interest_coverage,
             "total_debt": self.total_debt,
-            "net_worth_history": self.net_worth_history,
+            "long_term_debt": self.long_term_debt,
+            "short_term_borrowings": self.short_term_borrowings,
+            "net_worth": self.net_worth,
             "current_ratio": self.current_ratio,
             "debt_equity_ratio": self.debt_equity_ratio,
             "promoter_contribution_pct": self.promoter_contribution_pct,
             "promoter_pledge_pct": self.promoter_pledge_pct,
-            "cheque_bounces_12m": self.cheque_bounces_12m,
-            "od_utilization_pct": self.od_utilization_pct,
+            "cheque_bounces_count": self.cheque_bounces_count,
+            "od_utilization_percent": self.od_utilization_percent,
             "bank_credits_annual": self.bank_credits_annual,
-            "gst_turnover": self.gst_turnover,
+            "gst_turnover_annual": self.gst_turnover_annual,
             "gstr_3b_itc": self.gstr_3b_itc,
             "gstr_2a_itc": self.gstr_2a_itc,
+            "gst_bank_gap_percent": self.gst_bank_gap_percent,
+            "period_months": self.period_months,
             "collateral_value": self.collateral_value,
             "collateral_type": self.collateral_type,
             "guarantee_type": self.guarantee_type,
@@ -302,7 +314,7 @@ class ScoreResult:
     conditions_score: float
     
     # Weighted total score (10-100)
-    total_score: float
+    final_score: float
     
     # Verdict
     verdict: Verdict
@@ -326,7 +338,7 @@ class ScoreResult:
             "capital_score": self.capital_score,
             "collateral_score": self.collateral_score,
             "conditions_score": self.conditions_score,
-            "total_score": self.total_score,
+            "final_score": self.final_score,
             "verdict": self.verdict.value,
             "loan_amount": self.loan_amount,
             "interest_rate": self.interest_rate,

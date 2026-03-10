@@ -56,14 +56,14 @@ def format_table(doc: Document, headers: List[str], rows: List[List[str]]) -> No
 
 def format_currency_inr(amount: Optional[float], unit: str = "Crores") -> str:
     """
-    Format currency in Indian format (₹ Crores/Lakhs).
+    Format currency in Indian format (₹ 1,00,000.00 Crores).
     
     Args:
         amount: Amount in Crores
         unit: "Crores" or "Lakhs"
         
     Returns:
-        str: Formatted currency string
+        str: Formatted currency string in Indian notation
     """
     if amount is None:
         return "N/A"
@@ -71,8 +71,30 @@ def format_currency_inr(amount: Optional[float], unit: str = "Crores") -> str:
     if unit == "Lakhs":
         amount = amount * 100  # Convert Crores to Lakhs
     
-    # Format with 2 decimal places and Indian comma notation
-    return f"₹ {amount:,.2f} {unit}"
+    # Format with Indian comma notation (last 3 digits, then groups of 2)
+    amount_str = f"{amount:.2f}"
+    parts = amount_str.split('.')
+    integer_part = parts[0]
+    decimal_part = parts[1] if len(parts) > 1 else "00"
+    
+    # Apply Indian grouping
+    if len(integer_part) > 3:
+        last_three = integer_part[-3:]
+        remaining = integer_part[:-3]
+        
+        # Group remaining digits in pairs from right to left
+        grouped = []
+        for i in range(len(remaining) - 1, -1, -2):
+            if i == 0:
+                grouped.append(remaining[0])
+            else:
+                grouped.append(remaining[max(0, i-1):i+1])
+        
+        indian_format = ','.join(reversed(grouped)) + ',' + last_three
+    else:
+        indian_format = integer_part
+    
+    return f"₹ {indian_format}.{decimal_part} {unit}"
 
 
 def add_executive_summary(doc: Document, company_data: CompanyData, score_result: ScoreResult) -> None:
@@ -173,15 +195,15 @@ def add_financial_analysis(doc: Document, financials: Optional[FinancialData]) -
     doc.add_heading('Revenue and Profitability', level=2)
     
     revenue_rows = []
-    if financials.revenue_history and len(financials.revenue_history) >= 3:
-        revenue_rows.append(["Revenue (Current Year)", format_currency_inr(financials.revenue_history[0])])
-        revenue_rows.append(["Revenue (Year -1)", format_currency_inr(financials.revenue_history[1])])
-        revenue_rows.append(["Revenue (Year -2)", format_currency_inr(financials.revenue_history[2])])
+    if financials.revenue and len(financials.revenue) >= 3:
+        revenue_rows.append(["Revenue (Current Year)", format_currency_inr(financials.revenue[0])])
+        revenue_rows.append(["Revenue (Year -1)", format_currency_inr(financials.revenue[1])])
+        revenue_rows.append(["Revenue (Year -2)", format_currency_inr(financials.revenue[2])])
     
-    if financials.net_profit_history and len(financials.net_profit_history) >= 3:
-        revenue_rows.append(["Net Profit (Current Year)", format_currency_inr(financials.net_profit_history[0])])
-        revenue_rows.append(["Net Profit (Year -1)", format_currency_inr(financials.net_profit_history[1])])
-        revenue_rows.append(["Net Profit (Year -2)", format_currency_inr(financials.net_profit_history[2])])
+    if financials.net_profit and len(financials.net_profit) >= 3:
+        revenue_rows.append(["Net Profit (Current Year)", format_currency_inr(financials.net_profit[0])])
+        revenue_rows.append(["Net Profit (Year -1)", format_currency_inr(financials.net_profit[1])])
+        revenue_rows.append(["Net Profit (Year -2)", format_currency_inr(financials.net_profit[2])])
     
     if financials.ebitda is not None:
         revenue_rows.append(["EBITDA", format_currency_inr(financials.ebitda)])
@@ -200,8 +222,8 @@ def add_financial_analysis(doc: Document, financials: Optional[FinancialData]) -
         ["Total Debt", format_currency_inr(financials.total_debt)]
     ]
     
-    if financials.net_worth_history and len(financials.net_worth_history) > 0:
-        ratio_rows.append(["Net Worth (Current)", format_currency_inr(financials.net_worth_history[0])])
+    if financials.net_worth and len(financials.net_worth) > 0:
+        ratio_rows.append(["Net Worth (Current)", format_currency_inr(financials.net_worth[0])])
     
     format_table(doc, ["Ratio", "Value"], ratio_rows)
     
@@ -209,8 +231,8 @@ def add_financial_analysis(doc: Document, financials: Optional[FinancialData]) -
     doc.add_heading('Banking Conduct', level=2)
     
     banking_rows = [
-        ["Cheque Bounces (12 months)", str(financials.cheque_bounces_12m)],
-        ["OD Utilization", f"{financials.od_utilization_pct:.1f}%" if financials.od_utilization_pct is not None else "N/A"],
+        ["Cheque Bounces (12 months)", str(financials.cheque_bounces_count)],
+        ["OD Utilization", f"{financials.od_utilization_percent:.1f}%" if financials.od_utilization_percent is not None else "N/A"],
         ["Annual Bank Credits", format_currency_inr(financials.bank_credits_annual)]
     ]
     
@@ -599,21 +621,21 @@ def test_report_generator():
     
     # IL&FS test data (from scorer.py)
     ilfs_financials = FinancialData(
-        revenue_history=[8500.0, 9200.0, 9800.0],
-        net_profit_history=[-5000.0, -3000.0, 500.0],
+        revenue=[8500.0, 9200.0, 9800.0],
+        net_profit=[-5000.0, -3000.0, 500.0],
         ebitda=1200.0,
         dscr=0.58,
         interest_coverage=0.8,
         total_debt=91000.0,
-        net_worth_history=[-15000.0, -8000.0, 5000.0],
+        net_worth=[-15000.0, -8000.0, 5000.0],
         current_ratio=0.6,
         debt_equity_ratio=7.8,
         promoter_contribution_pct=8.0,
         promoter_pledge_pct=72.0,
-        cheque_bounces_12m=9,
-        od_utilization_pct=94.0,
+        cheque_bounces_count=9,
+        od_utilization_percent=94.0,
         bank_credits_annual=3680.0,
-        gst_turnover=8500.0,
+        gst_turnover_annual=8500.0,
         gstr_3b_itc=850.0,
         gstr_2a_itc=820.0,
         collateral_value=1200.0,

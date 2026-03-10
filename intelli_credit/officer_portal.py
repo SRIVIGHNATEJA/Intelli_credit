@@ -230,7 +230,7 @@ def collect_officer_notes(company_name: str) -> List[OfficerNote]:
                 help="Score adjustment: -25 (negative) to +10 (positive)"
             )
         
-        submitted = st.form_submit_button("Add Note", use_container_width=True)
+        submitted = st.form_submit_button("Add Note")
         
         if submitted:
             if not note_text.strip():

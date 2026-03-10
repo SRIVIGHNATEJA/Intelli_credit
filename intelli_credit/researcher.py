@@ -25,19 +25,21 @@ API_TIMEOUT = 5  # seconds
 # NEWS SEARCH - FALLBACK CHAIN
 # ============================================================================
 
-def search_news_serper(company_name: str) -> List[Dict[str, str]]:
+def search_news_serper(company_name: str, promoter_name: str = "") -> List[Dict[str, str]]:
     """
-    Primary news search using Serper API.
-    NO date filters - let search engine rank by relevance.
+    Primary news search using Serper API with 7 targeted query categories.
+    GOLD STANDARD: Comprehensive credit-relevant search across all risk categories.
     
     Args:
         company_name: Name of the company to search
+        promoter_name: Name of promoter/founder (optional, for criminal case searches)
         
     Returns:
-        List of news dicts with title, source, date, url
+        List of news dicts with title, source, date, url, category, snippet
     """
     api_key = os.getenv("SERPER_API_KEY")
     if not api_key:
+        print("⚠ Serper API key not found")
         return []
     
     try:
@@ -46,76 +48,190 @@ def search_news_serper(company_name: str) -> List[Dict[str, str]]:
             "X-API-KEY": api_key,
             "Content-Type": "application/json"
         }
-        payload = {
-            "q": f"{company_name} India",
-            "num": MAX_NEWS_ITEMS
-        }
         
-        response = requests.post(
-            url,
-            json=payload,
-            headers=headers,
-            timeout=API_TIMEOUT
-        )
-        response.raise_for_status()
+        # GOLD STANDARD: 7 COMPREHENSIVE QUERY CATEGORIES
+        # Each category targets specific credit risk indicators
+        queries = [
+            # Category 1: Fraud & Regulatory Enforcement
+            {
+                "query": f'"{company_name}" fraud SEBI ED CBI default enforcement penalty action',
+                "category": "Fraud_Regulatory",
+                "description": "Fraud cases, regulatory enforcement, penalties"
+            },
+            
+            # Category 2: Insolvency & Legal Proceedings  
+            {
+                "query": f'"{company_name}" NCLT insolvency winding up liquidation bankruptcy proceedings',
+                "category": "Insolvency_Legal", 
+                "description": "NCLT cases, insolvency, bankruptcy proceedings"
+            },
+            
+            # Category 3: Criminal Cases & Investigations
+            {
+                "query": f'"{promoter_name or company_name}" criminal arrest investigation EOW FIR charges police' if promoter_name else f'"{company_name}" criminal case investigation EOW',
+                "category": "Criminal_Cases",
+                "description": "Criminal cases, arrests, investigations"
+            },
+            
+            # Category 4: Banking & Credit Issues
+            {
+                "query": f'"{company_name}" NPA default bank debt restructuring loan recall moratorium',
+                "category": "Banking_Credit",
+                "description": "NPA classification, loan defaults, debt issues"
+            },
+            
+            # Category 5: Recent News & Developments
+            {
+                "query": f'"{company_name}" news 2024 2025 latest developments announcement',
+                "category": "Recent_News",
+                "description": "Latest news and corporate developments"
+            },
+            
+            # Category 6: Financial Performance & Results
+            {
+                "query": f'"{company_name}" financial results earnings revenue profit loss quarterly annual performance',
+                "category": "Financial_Performance", 
+                "description": "Financial results, earnings, performance"
+            },
+            
+            # Category 7: Ratings & Credit Assessment
+            {
+                "query": f'"{company_name}" rating downgrade upgrade credit assessment CRISIL ICRA CARE Moody Fitch',
+                "category": "Credit_Ratings",
+                "description": "Credit ratings, downgrades, upgrades"
+            }
+        ]
         
-        data = response.json()
-        news_items = []
+        all_news = []
+        seen_urls = set()
         
-        for item in data.get("news", [])[:MAX_NEWS_ITEMS]:
-            news_items.append({
-                "title": item.get("title", ""),
-                "source": item.get("source", "Unknown"),
-                "date": item.get("date", ""),
-                "url": item.get("link", ""),
-                "snippet": item.get("snippet", "")
-            })
+        for i, query_info in enumerate(queries, 1):
+            query = query_info["query"]
+            category = query_info["category"]
+            description = query_info["description"]
+            
+            print(f"🔍 Category {i} ({category}): {description}")
+            print(f"   Query: {query[:80]}...")
+            
+            payload = {
+                "q": query,
+                "num": 3,  # 3 results per category = 21 total max
+                "gl": "in",  # India region
+                "hl": "en",  # English language
+                "tbm": "nws",  # News search
+                "tbs": "qdr:y2"  # Last 2 years for relevance
+            }
+            
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=API_TIMEOUT
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            category_count = 0
+            
+            for item in data.get("news", []):
+                url_link = item.get("link", "")
+                
+                # Skip duplicates
+                if url_link in seen_urls:
+                    continue
+                seen_urls.add(url_link)
+                
+                # Extract and validate news item
+                news_item = {
+                    "title": item.get("title", "").strip(),
+                    "source": item.get("source", "Unknown").strip(),
+                    "date": item.get("date", "").strip(),
+                    "url": url_link.strip(),
+                    "category": category,
+                    "snippet": item.get("snippet", "").strip()[:300],  # First 300 chars
+                    "search_rank": len(all_news) + 1  # Track search order
+                }
+                
+                # Validate required fields
+                if news_item["title"] and news_item["source"] and len(news_item["title"]) > 10:
+                    all_news.append(news_item)
+                    category_count += 1
+                    print(f"   ✓ Found: {news_item['title'][:70]}...")
+                    
+                    if category_count >= 3:  # Max 3 per category
+                        break
+            
+            if category_count == 0:
+                print(f"   ⚠ No results found for {category}")
+            
+            # Small delay between queries to avoid rate limiting
+            time.sleep(0.3)
         
-        return news_items
+        # Sort by relevance (fraud/legal issues first, then by search rank)
+        priority_categories = ["Fraud_Regulatory", "Criminal_Cases", "Insolvency_Legal", "Banking_Credit"]
+        
+        def sort_key(item):
+            category_priority = 0 if item["category"] in priority_categories else 1
+            return (category_priority, item["search_rank"])
+        
+        all_news.sort(key=sort_key)
+        
+        print(f"✓ Serper search complete: {len(all_news)} articles found across 7 categories")
+        print(f"  Categories covered: {len(set(item['category'] for item in all_news))}/7")
+        
+        return all_news[:MAX_NEWS_ITEMS]  # Return top results
         
     except Exception as e:
-        print(f"Serper API error: {e}")
+        print(f"⚠ Serper API error: {e}")
         return []
 
 
 def search_news_gdelt(company_name: str) -> List[Dict[str, str]]:
     """
     Backup 1: News search using GDELT API (free, no auth).
-    NO date filters - let search engine rank by relevance.
-    
+    Uses COMPREHENSIVE queries covering all 7 credit risk categories.
+
     Args:
         company_name: Name of the company to search
-        
+
     Returns:
         List of news dicts with title, source, date, url
     """
     try:
         # GDELT DOC 2.0 API endpoint
         url = "https://api.gdeltproject.org/api/v2/doc/doc"
+
+        # ENHANCED: Comprehensive query covering all 7 categories
+        # Fraud & Regulatory + Insolvency + Banking + Criminal + Financial + Ratings + Recent
+        query = f'"{company_name}" (fraud OR SEBI OR ED OR CBI OR default OR enforcement OR penalty OR NCLT OR insolvency OR winding OR liquidation OR bankruptcy OR criminal OR arrest OR investigation OR NPA OR debt OR restructuring OR loan OR recall OR financial OR earnings OR revenue OR profit OR rating OR downgrade OR upgrade OR CRISIL OR ICRA OR CARE OR Moody OR Fitch OR news OR latest OR developments)'
+
         params = {
-            "query": f"{company_name} India",
+            "query": query,
             "mode": "artlist",
             "maxrecords": MAX_NEWS_ITEMS,
-            "format": "json"
+            "format": "json",
+            "timespan": "2y"  # Last 2 years for relevance
         }
-        
+
         response = requests.get(url, params=params, timeout=API_TIMEOUT)
         response.raise_for_status()
-        
+
         data = response.json()
         news_items = []
-        
+
         for item in data.get("articles", [])[:MAX_NEWS_ITEMS]:
             news_items.append({
                 "title": item.get("title", ""),
                 "source": item.get("domain", "Unknown"),
                 "date": item.get("seendate", ""),
                 "url": item.get("url", ""),
-                "snippet": item.get("socialimage", "")
+                "snippet": item.get("socialimage", ""),
+                "category": "Mixed"  # GDELT doesn't categorize, so mark as mixed
             })
-        
+
+        print(f"✓ GDELT enhanced search: {len(news_items)} articles found")
         return news_items
-        
+
     except Exception as e:
         print(f"GDELT API error: {e}")
         return []
@@ -124,45 +240,53 @@ def search_news_gdelt(company_name: str) -> List[Dict[str, str]]:
 def search_news_newsapi(company_name: str) -> List[Dict[str, str]]:
     """
     Backup 2: News search using NewsAPI.
-    NO date filters - let search engine rank by relevance.
-    
+    Uses COMPREHENSIVE queries covering all 7 credit risk categories.
+
     Args:
         company_name: Name of the company to search
-        
+
     Returns:
         List of news dicts with title, source, date, url
     """
     api_key = os.getenv("NEWSAPI_KEY")
     if not api_key:
         return []
-    
+
     try:
         url = "https://newsapi.org/v2/everything"
+
+        # ENHANCED: Comprehensive query covering all 7 categories
+        # Fraud & Regulatory + Insolvency + Banking + Criminal + Financial + Ratings + Recent
+        query = f'"{company_name}" AND (fraud OR SEBI OR ED OR CBI OR default OR enforcement OR penalty OR NCLT OR insolvency OR winding OR liquidation OR bankruptcy OR criminal OR arrest OR investigation OR NPA OR debt OR restructuring OR loan OR recall OR financial OR earnings OR revenue OR profit OR rating OR downgrade OR upgrade OR CRISIL OR ICRA OR CARE OR Moody OR Fitch OR news OR latest OR developments)'
+
         params = {
-            "q": f"{company_name} India",
+            "q": query,
             "apiKey": api_key,
             "pageSize": MAX_NEWS_ITEMS,
             "language": "en",
-            "sortBy": "relevancy"
+            "sortBy": "relevancy",
+            "from": "2023-01-01"  # Last 2+ years for relevance
         }
-        
+
         response = requests.get(url, params=params, timeout=API_TIMEOUT)
         response.raise_for_status()
-        
+
         data = response.json()
         news_items = []
-        
+
         for item in data.get("articles", [])[:MAX_NEWS_ITEMS]:
             news_items.append({
                 "title": item.get("title", ""),
                 "source": item.get("source", {}).get("name", "Unknown"),
                 "date": item.get("publishedAt", ""),
                 "url": item.get("url", ""),
-                "snippet": item.get("description", "")
+                "snippet": item.get("description", ""),
+                "category": "Mixed"  # NewsAPI doesn't categorize, so mark as mixed
             })
-        
+
+        print(f"✓ NewsAPI enhanced search: {len(news_items)} articles found")
         return news_items
-        
+
     except Exception as e:
         print(f"NewsAPI error: {e}")
         return []
@@ -406,34 +530,38 @@ def classify_sector_outlook_with_groq(sector: str, news_context: str) -> Optiona
 def research_company(
     cin: str,
     company_name: str,
-    description: str = ""
+    description: str = "",
+    promoter_name: str = ""
 ) -> ResearchResult:
     """
     Master function to research company using all available sources.
     Implements fallback chain for news and graceful error handling.
-    
+
     Args:
         cin: Corporate Identification Number
         company_name: Name of the company
         description: Optional company description
-        
+        promoter_name: Optional promoter/founder name for criminal case searches
+
     Returns:
         ResearchResult object with all gathered data
     """
     print(f"\n{'='*60}")
     print(f"Researching: {company_name}")
     print(f"CIN: {cin}")
+    if promoter_name:
+        print(f"Promoter: {promoter_name}")
     print(f"{'='*60}\n")
-    
+
     # Initialize result
     result = ResearchResult(validation_status="POTENTIAL_MATCH")
-    
+
     # 1. News search with fallback chain
     print("Searching news (Serper → GDELT → NewsAPI)...")
     news_data = []
-    
-    # Try Serper first
-    news_data = search_news_serper(company_name)
+
+    # Try Serper first (with promoter name for criminal searches)
+    news_data = search_news_serper(company_name, promoter_name)
     if news_data:
         print(f"✓ Serper: Found {len(news_data)} articles")
     else:
@@ -450,7 +578,7 @@ def research_company(
                 print(f"✓ NewsAPI: Found {len(news_data)} articles")
             else:
                 print("✗ All news sources failed")
-    
+
     # Convert to NewsItem objects
     result.news_items = [
         NewsItem(
@@ -462,7 +590,7 @@ def research_company(
         )
         for item in news_data
     ]
-    
+
     # 2. MCA status lookup
     print("\nLooking up MCA status...")
     mca_status = lookup_mca_status(cin)
@@ -472,7 +600,7 @@ def research_company(
     else:
         print("✗ MCA status not found")
         result.mca_status = None
-    
+
     # 3. Stock data lookup
     print("\nFetching stock data...")
     stock_data = get_stock_data(company_name)
@@ -483,7 +611,7 @@ def research_company(
     else:
         print("✗ Not listed or data unavailable")
         result.stock_data = StockData(is_listed=False)
-    
+
     # 4. Sector classification
     print("\nClassifying sector...")
     sector = classify_sector_with_groq(company_name, description)
@@ -493,7 +621,7 @@ def research_company(
     else:
         print("✗ Sector classification failed")
         result.sector = None
-    
+
     # 5. Sector outlook (if we have news and sector)
     if result.sector and result.news_items:
         print("\nAnalyzing sector outlook...")
@@ -501,7 +629,7 @@ def research_company(
         news_context = "\n".join([
             f"- {item.title}" for item in result.news_items[:3]
         ])
-        
+
         outlook = classify_sector_outlook_with_groq(result.sector, news_context)
         if outlook:
             print(f"✓ Outlook: {outlook}")
@@ -512,7 +640,7 @@ def research_company(
     else:
         print("\nSkipping sector outlook (insufficient data)")
         result.sector_outlook = "STABLE"
-    
+
     # 6. Set sector NPA rate (hardcoded based on sector)
     if result.sector:
         SECTOR_NPA = {
@@ -529,7 +657,7 @@ def research_company(
             "Retail": 3.4,
             "Construction": 8.8
         }
-        
+
         # Try to match sector (case-insensitive, partial match)
         sector_lower = result.sector.lower()
         for key, npa_rate in SECTOR_NPA.items():
@@ -537,16 +665,16 @@ def research_company(
                 result.sector_npa_rate = npa_rate
                 print(f"✓ Sector NPA Rate: {npa_rate}%")
                 break
-        
+
         if result.sector_npa_rate is None:
             # Default to average
             result.sector_npa_rate = 6.5
             print(f"⚠ Using average NPA rate: 6.5%")
-    
+
     print(f"\n{'='*60}")
     print("Research complete")
     print(f"{'='*60}\n")
-    
+
     return result
 
 

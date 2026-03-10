@@ -23,8 +23,8 @@ def create_ilfs_financial_data() -> FinancialData:
     """Create realistic IL&FS financial data (distressed company)"""
     return FinancialData(
         # Revenue declining (Infrastructure Finance sector)
-        revenue_history=[8500.0, 12000.0, 15000.0],  # Current, -1, -2 years (₹ Crores)
-        net_profit_history=[-2500.0, -1800.0, 500.0],  # Losses in recent years
+        revenue=[8500.0, 12000.0, 15000.0],  # Current, -1, -2 years (₹ Crores)
+        net_profit=[-2500.0, -1800.0, 500.0],  # Losses in recent years
         ebitda=-1200.0,
         
         # Poor debt servicing
@@ -33,7 +33,7 @@ def create_ilfs_financial_data() -> FinancialData:
         total_debt=91000.0,  # High debt
         
         # Weak balance sheet
-        net_worth_history=[-15000.0, -8000.0, 5000.0],  # Negative net worth
+        net_worth=[-15000.0, -8000.0, 5000.0],  # Negative net worth
         current_ratio=0.85,
         debt_equity_ratio=7.80,  # Very high leverage
         
@@ -42,12 +42,12 @@ def create_ilfs_financial_data() -> FinancialData:
         promoter_pledge_pct=72.0,  # High distress signal
         
         # Poor banking conduct
-        cheque_bounces_12m=9,
-        od_utilization_pct=94.0,  # Overextended
+        cheque_bounces_count=9,
+        od_utilization_percent=94.0,  # Overextended
         bank_credits_annual=25000.0,
         
         # GST issues (circular trading)
-        gst_turnover=8500.0,
+        gst_turnover_annual=8500.0,
         gstr_3b_itc=850.0,
         gstr_2a_itc=750.0,  # ITC gap
         
@@ -79,8 +79,8 @@ def create_tcs_financial_data() -> FinancialData:
     """Create realistic TCS financial data (strong IT company)"""
     return FinancialData(
         # Strong revenue growth (IT Services)
-        revenue_history=[164000.0, 156000.0, 146000.0],  # Growing
-        net_profit_history=[38500.0, 36000.0, 32400.0],  # Consistent profits
+        revenue=[164000.0, 156000.0, 146000.0],  # Growing
+        net_profit=[38500.0, 36000.0, 32400.0],  # Consistent profits
         ebitda=52000.0,
         
         # Excellent debt servicing
@@ -89,7 +89,7 @@ def create_tcs_financial_data() -> FinancialData:
         total_debt=2500.0,  # Low debt
         
         # Strong balance sheet
-        net_worth_history=[85000.0, 78000.0, 72000.0],  # Growing
+        net_worth=[85000.0, 78000.0, 72000.0],  # Growing
         current_ratio=2.8,
         debt_equity_ratio=0.2,  # Very low leverage
         
@@ -98,12 +98,12 @@ def create_tcs_financial_data() -> FinancialData:
         promoter_pledge_pct=0.0,  # No pledge
         
         # Excellent banking conduct
-        cheque_bounces_12m=0,
-        od_utilization_pct=15.0,  # Conservative
+        cheque_bounces_count=0,
+        od_utilization_percent=15.0,  # Conservative
         bank_credits_annual=180000.0,
         
         # Clean GST
-        gst_turnover=164000.0,
+        gst_turnover_annual=164000.0,
         gstr_3b_itc=8200.0,
         gstr_2a_itc=8150.0,  # Minimal gap
         
@@ -135,8 +135,8 @@ def create_byjus_financial_data() -> FinancialData:
     """Create realistic Byju's financial data (distressed EdTech)"""
     return FinancialData(
         # Declining revenue (EdTech sector)
-        revenue_history=[2200.0, 2800.0, 2400.0],  # Volatile
-        net_profit_history=[-1800.0, -1200.0, -800.0],  # Consistent losses
+        revenue=[2200.0, 2800.0, 2400.0],  # Volatile
+        net_profit=[-1800.0, -1200.0, -800.0],  # Consistent losses
         ebitda=-900.0,
         
         # Poor debt servicing
@@ -145,7 +145,7 @@ def create_byjus_financial_data() -> FinancialData:
         total_debt=8500.0,  # High for size
         
         # Deteriorating balance sheet
-        net_worth_history=[-2500.0, -800.0, 1200.0],  # Negative
+        net_worth=[-2500.0, -800.0, 1200.0],  # Negative
         current_ratio=0.65,
         debt_equity_ratio=12.5,  # Extremely high
         
@@ -154,12 +154,12 @@ def create_byjus_financial_data() -> FinancialData:
         promoter_pledge_pct=85.0,  # Very high distress
         
         # Banking issues
-        cheque_bounces_12m=12,
-        od_utilization_pct=98.0,  # Maxed out
+        cheque_bounces_count=12,
+        od_utilization_percent=98.0,  # Maxed out
         bank_credits_annual=3500.0,
         
         # GST compliance issues
-        gst_turnover=2200.0,
+        gst_turnover_annual=2200.0,
         gstr_3b_itc=330.0,
         gstr_2a_itc=250.0,  # Significant ITC gap
         
@@ -399,8 +399,8 @@ def generate_cache_for_company(company_key: str, company_info: dict):
         print(f"✅ Company data created for {company_data.company_name}")
         print(f"   CIN: {company_data.cin}")
         print(f"   Sector: {company_data.research.sector}")
-        print(f"   Revenue: ₹{financials.revenue_history[0]:,.0f} Cr")
-        print(f"   Net Worth: ₹{financials.net_worth_history[0]:,.0f} Cr")
+        print(f"   Revenue: ₹{financials.revenue[0]:,.0f} Cr")
+        print(f"   Net Worth: ₹{financials.net_worth[0]:,.0f} Cr")
         print(f"   D/E Ratio: {financials.debt_equity_ratio:.2f}")
         
         # Step 5: Calculate Five Cs score
@@ -413,7 +413,7 @@ def generate_cache_for_company(company_key: str, company_info: dict):
         print(f"   CAPITAL: {score_result.capital_score:.1f}/100")
         print(f"   COLLATERAL: {score_result.collateral_score:.1f}/100")
         print(f"   CONDITIONS: {score_result.conditions_score:.1f}/100")
-        print(f"   TOTAL: {score_result.total_score:.1f}/100")
+        print(f"   TOTAL: {score_result.final_score:.1f}/100")
         print(f"   VERDICT: {score_result.verdict.value}")
         print(f"   FLAGS: {len(score_result.flags)}")
         
