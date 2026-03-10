@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 import pandas as pd
 import plotly.graph_objects as go
 from streamlit_option_menu import option_menu
-import math
+
 
 from data_models import CompanyData, ScoreResult
 from pipeline import process_application
@@ -651,7 +651,7 @@ def page_application_intake():
                 min_value=1,
                 max_value=10,
                 value=3,
-                help="1 = Highest risk, 10 = Lowest risk"
+                help="1 = Lowest risk (best), 10 = Highest risk (worst)"
             )
             
             if cibil_score > 6:
@@ -699,7 +699,8 @@ def page_application_intake():
                     promoter_name=promoter_name_input if promoter_name_input else None,
                     uploaded_files=st.session_state.uploaded_file_paths if not is_demo else None,
                     demo_mode=is_demo,
-                    demo_company_key=selected_demo if is_demo else None
+                    demo_company_key=selected_demo if is_demo else None,
+                    cibil_cmr=int(cibil_score)
                 )
                 
                 progress_bar.progress(50)
@@ -1002,7 +1003,13 @@ def page_credit_analysis():
                 </div>
                 """, unsafe_allow_html=True)
                 
-                cat_flags = [f for f in score_result.flags if f.category.value == cat_name]
+                # Include related flag categories (GST_FRAUD affects CAPACITY, EARLY_WARNING affects CHARACTER)
+                related_categories = {
+                    "CAPACITY": ["CAPACITY", "GST_FRAUD"],
+                    "CHARACTER": ["CHARACTER", "EARLY_WARNING"],
+                }
+                match_cats = related_categories.get(cat_name, [cat_name])
+                cat_flags = [f for f in score_result.flags if f.category.value in match_cats]
                 if cat_flags:
                     st.markdown(f"""
                     <div style="color: #1f2937; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">
@@ -1026,6 +1033,34 @@ def page_credit_analysis():
                                 border-left: 3px solid #10b981; text-align: center;">
                         <span style="color: #10b981; font-size: 1.2rem;">✓</span>
                         <span style="color: #059669; font-weight: 600; margin-left: 0.5rem;">No flags detected</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Show score computation trail if available
+                if hasattr(score_result, 'score_trails') and score_result.score_trails and cat_name in score_result.score_trails:
+                    trail = score_result.score_trails[cat_name]
+                    st.markdown("""
+                    <div style="margin-top: 1rem; color: #1f2937; font-size: 0.85rem; font-weight: 600;">
+                        📐 Score Computation
+                    </div>
+                    """, unsafe_allow_html=True)
+                    trail_html = ""
+                    for line in trail:
+                        if line.startswith("Base:"):
+                            trail_html += f'<div style="color: #059669; font-weight: 600;">{line}</div>'
+                        elif line.startswith("→"):
+                            trail_html += f'<div style="color: #1f2937; font-weight: 700; border-top: 1px solid #e5e7eb; padding-top: 0.3rem; margin-top: 0.3rem;">{line}</div>'
+                        elif line.startswith("-"):
+                            trail_html += f'<div style="color: #ef4444;">{line}</div>'
+                        elif line.startswith("+"):
+                            trail_html += f'<div style="color: #10b981;">{line}</div>'
+                        else:
+                            trail_html += f'<div style="color: #6b7280;">{line}</div>'
+                    st.markdown(f"""
+                    <div style="background: #f9fafb; padding: 0.8rem; border-radius: 8px; 
+                                font-family: 'Courier New', monospace; font-size: 0.85rem;
+                                border: 1px solid #e5e7eb; margin-top: 0.5rem;">
+                        {trail_html}
                     </div>
                     """, unsafe_allow_html=True)
     
@@ -1092,6 +1127,15 @@ def page_credit_analysis():
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+                
+                # Persist officer notes and adjusted scores to session state
+                st.session_state.company_data.officer_notes = officer_notes
+                st.session_state.score_result.character_score = adjusted_scores["CHARACTER"]
+                st.session_state.score_result.capacity_score = adjusted_scores["CAPACITY"]
+                st.session_state.score_result.capital_score = adjusted_scores["CAPITAL"]
+                st.session_state.score_result.collateral_score = adjusted_scores["COLLATERAL"]
+                st.session_state.score_result.conditions_score = adjusted_scores["CONDITIONS"]
+                st.session_state.score_result.final_score = round(adjusted_total, 1)
         else:
             st.warning("Company data not available for officer assessment")
     
@@ -1338,7 +1382,7 @@ def page_research():
         </div>
         """, unsafe_allow_html=True)
     with s2:
-        outlook_emoji = {"GROWING": "📈", "STABLE": "➡️", "DECLINING": "📉", "DISTRESSED": "�"}.get(research.sector_outlook, "➡️")
+        outlook_emoji = {"GROWING": "📈", "STABLE": "➡️", "DECLINING": "📉", "DISTRESSED": "🚨"}.get(research.sector_outlook, "➡️")
         outlook_color = {"POSITIVE": "#10b981", "NEUTRAL": "#f59e0b", "DISTRESSED": "#ef4444"}.get(research.sector_outlook, "#6b7280")
         st.markdown(f"""
         <div style="text-align: center; padding: 1rem;">
@@ -1389,6 +1433,33 @@ def page_research():
     </div>
     """, unsafe_allow_html=True)
     
+    if hasattr(research, 'mca_data') and research.mca_data:
+        d = research.mca_data
+        st.markdown(f"""
+        <div style="background: white; padding: 1.5rem; border-radius: 12px; 
+                    border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                    margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                <div>
+                    <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600;">Authorized Capital</div>
+                    <div style="color: #1f2937; font-weight: 600;">₹{d.get('authorized_capital', 0):.2f} Cr</div>
+                </div>
+                <div>
+                    <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600;">Paid-up Capital</div>
+                    <div style="color: #1f2937; font-weight: 600;">₹{d.get('paidup_capital', 0):.2f} Cr</div>
+                </div>
+                <div>
+                    <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600;">Registration Date</div>
+                    <div style="color: #1f2937; font-weight: 600;">{d.get('date_of_registration', 'N/A')}</div>
+                </div>
+                <div>
+                    <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600;">Company Class</div>
+                    <div style="color: #1f2937; font-weight: 600;">{d.get('company_class', 'N/A')}</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
     st.markdown("")
     
     # Stock
@@ -1438,7 +1509,7 @@ def page_research():
                 <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; 
                             letter-spacing: 1px; font-weight: 600; margin-bottom: 0.5rem;">52W High</div>
                 <div style="color: #10b981; font-size: 1.2rem; font-weight: 800;">
-                    N/A
+                    {"₹{:,.2f}".format(research.stock_data.fifty_two_week_high) if getattr(research.stock_data, 'fifty_two_week_high', None) else "N/A"}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1446,34 +1517,30 @@ def page_research():
         st.markdown("</div>", unsafe_allow_html=True)
     
     # News
-    if research.news_items:
+    if hasattr(research, 'news_items') and research.news_items:
         st.markdown("### 📰 Recent News")
         
-        # FIX: Filter out irrelevant news based on keywords
-        relevant_keywords = [
-            'financial', 'earnings', 'revenue', 'profit', 'loss', 'results',
-            'fraud', 'nclt', 'default', 'npa', 'insolvency', 'bankruptcy',
-            'rating', 'credit', 'debt', 'loan', 'borrowing',
-            'acquisition', 'merger', 'ipo', 'listing',
-            'regulatory', 'sebi', 'rbi', 'compliance'
-        ]
+        # Display AI News Synthesis if available
+        if hasattr(research, 'news_summary') and research.news_summary:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
+                        padding: 1.5rem; border-radius: 12px; border-left: 4px solid #0ea5e9;
+                        border-right: 1px solid #e0f2fe; border-top: 1px solid #e0f2fe; border-bottom: 1px solid #e0f2fe;
+                        margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.8rem;">
+                    <span style="font-size: 1.5rem;">🧠</span>
+                    <span style="color: #0369a1; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.5px;">
+                        AI Credit Risk Synthesis
+                    </span>
+                </div>
+                <div style="color: #0f172a; font-size: 0.95rem; line-height: 1.6;">
+                    {research.news_summary}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Filter news items for relevance
-        filtered_news = []
-        for news in research.news_items:
-            title_lower = news.title.lower()
-            snippet_lower = (news.snippet or '').lower()
-            
-            # Check if any relevant keyword is in title or snippet
-            is_relevant = any(keyword in title_lower or keyword in snippet_lower 
-                            for keyword in relevant_keywords)
-            
-            # Also filter out obvious irrelevant patterns
-            irrelevant_patterns = ['ward', 'tourism', 'travel', 'hotel', 'agenda', 'stocks to benefit']
-            is_irrelevant = any(pattern in title_lower for pattern in irrelevant_patterns)
-            
-            if is_relevant and not is_irrelevant:
-                filtered_news.append(news)
+        # Just use the items directly since researcher.py handles relevance filtering now
+        filtered_news = research.news_items
         
         if not filtered_news:
             st.info("No relevant credit-related news found for this company.")

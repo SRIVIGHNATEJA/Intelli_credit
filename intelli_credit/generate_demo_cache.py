@@ -52,7 +52,7 @@ def create_ilfs_financial_data() -> FinancialData:
         gstr_2a_itc=750.0,  # ITC gap
         
         # Collateral
-        collateral_value=45000.0,
+        collateral_value=1200.0,  # 1200 * 0.75 / 1000 = 0.9x coverage → score ~40
         collateral_type="Property",
         guarantee_type="Corporate",
         loan_requested=1000.0,

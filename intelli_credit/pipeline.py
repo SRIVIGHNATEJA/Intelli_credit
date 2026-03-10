@@ -85,14 +85,16 @@ def compute_derived_fields(financials: FinancialData) -> FinancialData:
     # BANK CREDITS ANNUAL = Period Credits / Months * 12
     if financials.bank_credits_annual is None:
         credits = getattr(financials, 'total_credits_in_period', None)
-        months = financials.period_months
+        # Use bank-specific period, fall back to shared period_months
+        months = financials.bank_period_months or financials.period_months
         if credits and months and months > 0:
             financials.bank_credits_annual = round(credits / months * 12, 2)
     
     # GST TURNOVER ANNUAL = Period Turnover / Months * 12
     if financials.gst_turnover_annual is None:
         turnover = getattr(financials, 'gst_turnover_period', None)
-        months = financials.period_months
+        # Use GST-specific period, fall back to shared period_months
+        months = financials.gst_period_months or financials.period_months
         if turnover and months and months > 0:
             financials.gst_turnover_annual = round(turnover / months * 12, 2)
     
@@ -262,7 +264,9 @@ def _map_extracted_to_financials(
             if "total_credits_in_period" in extracted:
                 financials.total_credits_in_period = extracted["total_credits_in_period"]
             if "period_months" in extracted:
-                financials.period_months = extracted["period_months"]
+                financials.bank_period_months = extracted["period_months"]
+                if not financials.period_months:
+                    financials.period_months = extracted["period_months"]
             if "cheque_bounces_count" in extracted:
                 val = extracted["cheque_bounces_count"]
                 financials.cheque_bounces_count = val if val is not None else 0
@@ -276,8 +280,10 @@ def _map_extracted_to_financials(
             # GST data
             if "gst_turnover_period" in extracted:
                 financials.gst_turnover_period = extracted["gst_turnover_period"]
-            if "period_months" in extracted and not financials.period_months:
-                financials.period_months = extracted["period_months"]
+            if "period_months" in extracted:
+                financials.gst_period_months = extracted["period_months"]
+                if not financials.period_months:
+                    financials.period_months = extracted["period_months"]
             if "gstr_3b_itc" in extracted:
                 financials.gstr_3b_itc = extracted["gstr_3b_itc"]
             if "gstr_2a_itc" in extracted:
@@ -359,9 +365,8 @@ def run_analysis_pipeline(
             
             if gst_flags:
                 logger.info(f"Found {len(gst_flags)} GST fraud flags")
-                if not hasattr(company_data, 'gst_flags'):
-                    company_data.gst_flags = []
-                company_data.gst_flags.extend(gst_flags)
+                for flag in gst_flags:
+                    logger.info(f"  GST Flag: [{flag.severity.value}] {flag.description} (impact: {flag.impact_score})")
             else:
                 logger.info("No GST fraud flags detected")
                 
@@ -422,7 +427,8 @@ def process_application(
     promoter_name: Optional[str] = None,
     uploaded_files: Optional[Dict[str, str]] = None,
     demo_mode: bool = False,
-    demo_company_key: Optional[str] = None
+    demo_company_key: Optional[str] = None,
+    cibil_cmr: Optional[int] = None
 ) -> CompanyData:
     """
     Master function to process a credit application.
@@ -437,6 +443,7 @@ def process_application(
         uploaded_files: Dict mapping document_type to file_path (for real mode)
         demo_mode: If True, load from demo cache
         demo_company_key: Demo company key (e.g., "IL&FS", "TCS", "Byju's")
+        cibil_cmr: CIBIL Commercial CMR Rank (1-10)
         
     Returns:
         CompanyData object (never None, may be partial on errors)
@@ -463,8 +470,17 @@ def process_application(
                 logger.info(f"Total Score: {score_result.final_score:.1f}")
                 return company_data
             else:
-                logger.warning("Demo cache not found, falling back to real mode...")
-                # Fall through to real mode
+                logger.error(f"Demo cache not found for {demo_company_key}. Cannot fall back to real mode in demo.")
+                logger.error("Run 'python generate_demo_cache.py' to generate cache files.")
+                # Return minimal CompanyData — do NOT fall through to real mode
+                return CompanyData(
+                    cin=cin,
+                    company_name=company_name,
+                    promoter_name=promoter_name,
+                    financials=FinancialData(),
+                    demo_mode=True,
+                    cibil_cmr_rank=cibil_cmr
+                )
         
         # Real mode processing
         logger.info("Starting real-mode processing...")
@@ -474,7 +490,8 @@ def process_application(
             cin=cin,
             company_name=company_name,
             promoter_name=promoter_name,
-            demo_mode=False
+            demo_mode=False,
+            cibil_cmr_rank=cibil_cmr
         )
         
         # Validate uploaded files
@@ -603,7 +620,7 @@ if __name__ == "__main__":
     
     # Test demo mode
     company_data = process_application(
-        cin="L65990MH1987PLC044571",
+        cin="U65990MH1987PLC042230",
         company_name="Infrastructure Leasing and Financial Services Limited",
         demo_mode=True,
         demo_company_key="IL&FS"

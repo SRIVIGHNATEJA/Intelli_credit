@@ -428,8 +428,6 @@ def generate_decision_narrative(flags: List[FlagItem], verdict: str) -> str:
     """
     Generate one-sentence decision narrative from top 3 highest-impact flags.
     
-    Format: "[VERDICT]: [flag1 description] ([impact]) combined with [flag2] and [flag3] indicate [risk summary]."
-    
     Args:
         flags: All flags from scoring
         verdict: Credit decision verdict
@@ -446,14 +444,22 @@ def generate_decision_narrative(flags: List[FlagItem], verdict: str) -> str:
     # Get top 3 flags
     top_flags = sorted_flags[:3]
     
+    # Verdict-appropriate conclusion
+    if verdict == "APPROVE":
+        conclusion = "are within acceptable credit parameters."
+    elif verdict == "CONDITIONAL":
+        conclusion = "warrant conditional approval with monitoring."
+    else:
+        conclusion = "indicate significant credit risk."
+    
     if len(top_flags) == 0:
         return f"{verdict}: No significant risk factors identified."
     elif len(top_flags) == 1:
-        return f"{verdict}: {top_flags[0].description} (impact: {top_flags[0].impact_score:.1f}) indicates significant credit risk."
+        return f"{verdict}: {top_flags[0].description} (impact: {top_flags[0].impact_score:.1f}) — {conclusion}"
     elif len(top_flags) == 2:
-        return f"{verdict}: {top_flags[0].description} (impact: {top_flags[0].impact_score:.1f}) combined with {top_flags[1].description} indicate significant credit risk."
+        return f"{verdict}: {top_flags[0].description} (impact: {top_flags[0].impact_score:.1f}) combined with {top_flags[1].description} — {conclusion}"
     else:
-        return f"{verdict}: {top_flags[0].description} (impact: {top_flags[0].impact_score:.1f}) combined with {top_flags[1].description} and {top_flags[2].description} indicate significant credit risk."
+        return f"{verdict}: {top_flags[0].description} (impact: {top_flags[0].impact_score:.1f}) combined with {top_flags[1].description} and {top_flags[2].description} — {conclusion}"
 
 
 def add_recommendation(doc: Document, score_result: ScoreResult) -> None:
@@ -676,7 +682,7 @@ def test_report_generator():
     )
     
     ilfs_data = CompanyData(
-        cin="L65990MH1987PLC044571",
+        cin="U65990MH1987PLC042230",
         company_name="IL&FS",
         promoter_name="Ravi Parthasarathy",
         financials=ilfs_financials,

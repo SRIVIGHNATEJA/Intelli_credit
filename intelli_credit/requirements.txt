@@ -19,7 +19,6 @@ python-docx==1.1.0
 
 # Web Search & Research
 requests==2.31.0
-yfinance==0.2.36
 kagglehub==0.3.4
 
 # Data Processing

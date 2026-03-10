@@ -8,9 +8,12 @@ import time
 import requests
 import pandas as pd
 import yfinance as yf
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 from pathlib import Path
 from datetime import datetime
+import json
+import concurrent.futures
+import difflib
 from groq import Groq
 
 from data_models import ResearchResult, NewsItem, StockData
@@ -20,6 +23,61 @@ from prompts import get_sector_classification_prompt, get_sector_outlook_prompt
 # Constants
 MAX_NEWS_ITEMS = 5
 API_TIMEOUT = 5  # seconds
+
+# Common abbreviations for Indian companies
+COMPANY_ABBREVIATIONS = {
+    "tata consultancy services": ["tcs"],
+    "infrastructure leasing and financial services": ["il&fs", "ilfs", "il&fs"],
+    "think & learn": ["byju", "byjus", "byju's"],
+    "reliance industries": ["ril", "reliance"],
+    "infosys": ["infy"],
+    "wipro": ["wipro"],
+    "hdfc bank": ["hdfc"],
+    "state bank of india": ["sbi"],
+    "icici bank": ["icici"],
+    "larsen & toubro": ["l&t", "lnt"],
+    "hindustan unilever": ["hul"],
+    "bajaj finance": ["bajaj"],
+}
+
+
+def _get_company_keywords(company_name: str) -> list:
+    """
+    Build a list of keywords/abbreviations to check for relevance.
+    Returns lowercase keywords.
+    """
+    name_lower = company_name.lower().strip()
+    keywords = []
+    
+    # Add full company name
+    keywords.append(name_lower)
+    
+    # Check known abbreviations
+    for full_name, abbrevs in COMPANY_ABBREVIATIONS.items():
+        if full_name in name_lower or name_lower in full_name:
+            keywords.extend(abbrevs)
+    
+    # Add significant words (length >= 4, not generic)
+    generic_words = {"limited", "private", "public", "india", "services", 
+                     "company", "corporation", "enterprises", "industries",
+                     "group", "holdings", "international", "solutions"}
+    for word in name_lower.split():
+        cleaned = word.strip('.,()"\'')
+        if len(cleaned) >= 4 and cleaned not in generic_words:
+            keywords.append(cleaned)
+    
+    return list(set(keywords))
+
+
+def _is_relevant_news(news_item: dict, company_name: str) -> bool:
+    """
+    Check if a news article is actually about this company.
+    Prevents irrelevant results like Reliance fraud appearing for TCS.
+    """
+    keywords = _get_company_keywords(company_name)
+    text = (news_item.get("title", "") + " " + news_item.get("snippet", "")).lower()
+    
+    return any(kw in text for kw in keywords)
 
 
 # ============================================================================
@@ -106,81 +164,86 @@ def search_news_serper(company_name: str, promoter_name: str = "") -> List[Dict[
         all_news = []
         seen_urls = set()
         
-        for i, query_info in enumerate(queries, 1):
+        def fetch_category(query_info):
             query = query_info["query"]
             category = query_info["category"]
             description = query_info["description"]
             
-            print(f"🔍 Category {i} ({category}): {description}")
-            print(f"   Query: {query[:80]}...")
-            
             payload = {
                 "q": query,
-                "num": 3,  # 3 results per category = 21 total max
-                "gl": "in",  # India region
-                "hl": "en",  # English language
-                "tbm": "nws",  # News search
-                "tbs": "qdr:y2"  # Last 2 years for relevance
+                "num": 3,
+                "gl": "in",
+                "hl": "en",
+                "tbm": "nws",
+                "tbs": "qdr:y2"
             }
             
-            response = requests.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=API_TIMEOUT
-            )
-            response.raise_for_status()
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=API_TIMEOUT)
+                response.raise_for_status()
+                data = response.json()
+                
+                category_news = []
+                for item in data.get("news", []):
+                    item_url = item.get("link", "")
+                    if item_url and item_url not in seen_urls:
+                        news_item = {
+                            "title": item.get("title", "").strip(),
+                            "source": item.get("source", "Unknown").strip(),
+                            "date": item.get("date", "").strip(),
+                            "url": item_url.strip(),
+                            "category": category,
+                            "snippet": item.get("snippet", "").strip()[:300],
+                            "search_rank": 0  # Will be set later
+                        }
+                        if news_item["title"] and len(news_item["title"]) > 10:
+                            category_news.append(news_item)
+                            
+                        if len(category_news) >= 3:
+                            break
+                return category_news
+            except Exception as e:
+                print(f"   ⚠ Failed category {category}: {e}")
+                return []
+
+        # Run parallel queries
+        print("🔍 Running 7 parallel Serper queries...")
+        start_time = time.time()
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+            results = list(executor.map(fetch_category, queries))
             
-            data = response.json()
-            category_count = 0
-            
-            for item in data.get("news", []):
-                url_link = item.get("link", "")
+        for i, category_results in enumerate(results):
+            if not category_results:
+                print(f"   ⚠ No results found for category {queries[i]['category']}")
                 
-                # Skip duplicates
-                if url_link in seen_urls:
-                    continue
-                seen_urls.add(url_link)
-                
-                # Extract and validate news item
-                news_item = {
-                    "title": item.get("title", "").strip(),
-                    "source": item.get("source", "Unknown").strip(),
-                    "date": item.get("date", "").strip(),
-                    "url": url_link.strip(),
-                    "category": category,
-                    "snippet": item.get("snippet", "").strip()[:300],  # First 300 chars
-                    "search_rank": len(all_news) + 1  # Track search order
-                }
-                
-                # Validate required fields
-                if news_item["title"] and news_item["source"] and len(news_item["title"]) > 10:
-                    all_news.append(news_item)
-                    category_count += 1
-                    print(f"   ✓ Found: {news_item['title'][:70]}...")
+            for item in category_results:
+                if item["url"] not in seen_urls:
+                    seen_urls.add(item["url"])
+                    item["search_rank"] = len(all_news) + 1
+                    all_news.append(item)
+                    print(f"   ✓ {item['category']}: {item['title'][:70]}...")
                     
-                    if category_count >= 3:  # Max 3 per category
-                        break
-            
-            if category_count == 0:
-                print(f"   ⚠ No results found for {category}")
-            
-            # Small delay between queries to avoid rate limiting
-            time.sleep(0.3)
+        elapsed = time.time() - start_time
         
-        # Sort by relevance (fraud/legal issues first, then by search rank)
+        # Sort by relevance 
         priority_categories = ["Fraud_Regulatory", "Criminal_Cases", "Insolvency_Legal", "Banking_Credit"]
-        
         def sort_key(item):
             category_priority = 0 if item["category"] in priority_categories else 1
             return (category_priority, item["search_rank"])
-        
+            
         all_news.sort(key=sort_key)
         
-        print(f"✓ Serper search complete: {len(all_news)} articles found across 7 categories")
+        print(f"✓ Serper parallel search complete in {elapsed:.1f}s: {len(all_news)} articles found")
         print(f"  Categories covered: {len(set(item['category'] for item in all_news))}/7")
         
-        return all_news[:MAX_NEWS_ITEMS]  # Return top results
+        # POST-FETCH RELEVANCE FILTER: Remove articles not about this company
+        relevant_news = [item for item in all_news if _is_relevant_news(item, company_name)]
+        filtered_count = len(all_news) - len(relevant_news)
+        if filtered_count > 0:
+            print(f"  🔍 Filtered {filtered_count} irrelevant articles")
+        
+        return relevant_news[:MAX_NEWS_ITEMS]  # Return top relevant results
         
     except Exception as e:
         print(f"⚠ Serper API error: {e}")
@@ -293,21 +356,61 @@ def search_news_newsapi(company_name: str) -> List[Dict[str, str]]:
         return []
 
 
+def synthesize_news_with_groq(company_name: str, news_items: List[NewsItem]) -> Optional[str]:
+    """
+    Synthesize raw news headlines into a concise credit risk paragraph using Groq.
+    """
+    if not news_items:
+        return None
+        
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return None
+        
+    client = Groq(api_key=api_key)
+    
+    # Compile news context
+    news_context = "\n".join([f"- {item.title}: {item.snippet or ''}" for item in news_items[:10]])
+    
+    prompt = f"""
+    You are an expert credit risk analyst. Review the following recent news headlines and snippets for '{company_name}'.
+    Write a single, concise paragraph (max 4 sentences) synthesizing the key credit events, controversies, and overall risk sentiment.
+    Focus ONLY on information relevant to credit risk (financial distress, legal issues, fraud, regulatory actions, major management changes, or strong earnings).
+    If the news is mostly benign or unrelated to credit risk, briefly state that there are no major adverse signals.
+    Do not use introductory phrases like "Based on the news...", just provide the synthesis.
+    
+    News Context:
+    {news_context}
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            temperature=0.2,
+            max_tokens=250,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Groq News Synthesis Error: {e}")
+        return None
+
+
 # ============================================================================
 # MCA AND STOCK DATA LOOKUP
 # ============================================================================
 
-def lookup_mca_status(cin: str) -> Optional[str]:
+def lookup_mca_status(cin: str, company_name: str = "") -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
-    Query MCA demo companies CSV for company status.
+    Query MCA demo companies CSV for company status and static attributes.
+    If not found in CSV (older dataset), fallback to online LLM search.
     
-    Args:
-        cin: Corporate Identification Number
-        
     Returns:
-        Company status string (Active, Strike Off, etc.) or None
+        Tuple of (status_string, mca_data_dict)
     """
     csv_path = Path("mca_demo_companies.csv")
+    mca_data = None
+    status = None
     
     if not csv_path.exists():
         print(f"MCA CSV not found: {csv_path}")
@@ -334,8 +437,29 @@ def lookup_mca_status(cin: str) -> Optional[str]:
         matching_rows = df[df[cin_column] == cin]
         
         if matching_rows.empty:
-            print(f"No MCA record found for CIN: {cin}")
-            return None
+            # Not in local CSV — try online LLM fallback
+            print(f"No MCA record found in local CSV for CIN: {cin}. Attempting online extraction...")
+            
+            # Infer listing status base
+            prefix = cin[0] if cin else ''
+            base_status = "Not in local registry"
+            if prefix == 'L':
+                base_status = "Not in local registry (CIN prefix 'L' = Listed company)"
+            elif prefix == 'U':
+                base_status = "Not in local registry (CIN prefix 'U' = Unlisted company)"
+                
+            # Online Fallback via Serper + Groq
+            online_data = _online_mca_fallback(cin, company_name)
+            if online_data:
+                status = online_data.get("status", base_status)
+                mca_data = online_data
+            else:
+                status = f"{base_status} — verify on MCA portal"
+                mca_data = None
+                
+            return status, mca_data
+        
+        row = matching_rows.iloc[0]
         
         # Look for status column
         status_column = None
@@ -344,14 +468,60 @@ def lookup_mca_status(cin: str) -> Optional[str]:
                 status_column = col
                 break
         
-        if status_column:
-            return str(matching_rows.iloc[0][status_column])
-        else:
-            # Default to Active if no status column
-            return "Active"
+        status = str(row[status_column]) if status_column else "Active"
+        
+        # Extract rich structural attributes from Kaggle dataset
+        mca_data = {
+            "authorized_capital": float(row.get('AUTHORIZED_CAP', 0.0) or 0.0) / 10000000.0, # Convert Rs to Cr
+            "paidup_capital": float(row.get('PAIDUP_CAPITAL', 0.0) or 0.0) / 10000000.0, # Convert Rs to Cr
+            "date_of_registration": str(row.get('DATE_OF_REGISTRATION', 'N/A')),
+            "registered_state": str(row.get('REGISTERED_STATE', 'N/A')),
+            "company_class": str(row.get('COMPANY_CLASS', 'N/A')),
+            "activity_description": str(row.get('PRINCIPAL_BUSINESS_ACTIVITY_AS_PER_CIN', 'N/A'))
+        }
+        
+        return status, mca_data
         
     except Exception as e:
         print(f"Error reading MCA CSV: {e}")
+        return None, None
+
+def _online_mca_fallback(cin: str, company_name: str) -> Optional[Dict[str, Any]]:
+    """Uses Serper and Groq to find basic corporate attributes if not in CSV."""
+    api_key_s = os.getenv("SERPER_API_KEY")
+    api_key_g = os.getenv("GROQ_API_KEY")
+    if not api_key_s or not api_key_g:
+        return None
+        
+    try:
+        # Search online for company corporate details
+        url = "https://google.serper.dev/search"
+        headers = {"X-API-KEY": api_key_s, "Content-Type": "application/json"}
+        payload = {"q": f'"{cin}" OR "{company_name}" "authorized capital" "paid up capital" "date of incorporation" MCA', "num": 3}
+        response = requests.post(url, headers=headers, json=payload, timeout=API_TIMEOUT)
+        
+        if response.status_code != 200:
+            return None
+            
+        snippets = "\n".join([item.get("snippet", "") for item in response.json().get("organic", [])])
+        
+        client = Groq(api_key=api_key_g)
+        prompt = f"""
+        Extract corporate details for CIN: {cin} / {company_name} from these search snippets:
+        {snippets}
+        
+        Return ONLY a JSON object with these exact keys (use null or "N/A" if not found):
+        "status" (e.g., Active, Strike Off), "authorized_capital" (numeric float in Crores), "paidup_capital" (numeric float in Crores), "date_of_registration" (string YYYY-MM-DD or DD-MM-YYYY), "registered_state" (string), "company_class" (e.g. Private, Public)
+        """
+        res = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        return json.loads(res.choices[0].message.content)
+    except Exception as e:
+        print(f"Online MCA fallback error: {e}")
         return None
 
 
@@ -373,17 +543,53 @@ def get_stock_data(company_name: str) -> Optional[StockData]:
             "tcs": "TCS.NS",
             "infosys": "INFY.NS",
             "wipro": "WIPRO.NS",
-            "reliance": "RELIANCE.NS"
+            "reliance industries": "RELIANCE.NS",
+            "hdfc bank": "HDFCBANK.NS",
+            "icici bank": "ICICIBANK.NS",
+            "state bank": "SBIN.NS",
+            "sbi": "SBIN.NS",
+            "bajaj finance": "BAJFINANCE.NS",
+            "hindustan unilever": "HINDUNILVR.NS",
+            "larsen & toubro": "LT.NS",
+            "asian paints": "ASIANPAINT.NS",
+            "kotak mahindra bank": "KOTAKBANK.NS",
+            "maruti suzuki": "MARUTI.NS",
+            "sun pharma": "SUNPHARMA.NS",
+            "titan company": "TITAN.NS",
+            "ultratech cement": "ULTRACEMCO.NS",
+            "bharti airtel": "BHARTIARTL.NS",
+            "itc limited": "ITC.NS",
+            "hcl technologies": "HCLTECH.NS",
+            "tata motors": "TATAMOTORS.NS",
+            "mahindra & mahindra": "M&M.NS",
+            "axis bank": "AXISBANK.NS",
+            "tata steel": "TATASTEEL.NS",
+            "power grid corporation": "POWERGRID.NS",
+            "ntpc": "NTPC.NS",
+            "adani enterprises": "ADANIENT.NS"
         }
         
         # Try to find ticker
-        company_lower = company_name.lower()
+        company_lower = company_name.lower().replace(" limited", "").replace(" private", "").replace(" ltd", "").replace(" pvt", "").strip()
         ticker = None
         
-        for key, value in ticker_map.items():
-            if key in company_lower:
-                ticker = value
-                break
+        # 1. Exact match
+        if company_lower in ticker_map:
+            ticker = ticker_map[company_lower]
+        
+        # 2. Key substring match
+        if not ticker:
+            for key, value in ticker_map.items():
+                if key in company_lower or company_lower in key:
+                    ticker = value
+                    break
+                    
+        # 3. Fuzzy match using difflib
+        if not ticker:
+            matches = difflib.get_close_matches(company_lower, ticker_map.keys(), n=1, cutoff=0.6)
+            if matches:
+                ticker = ticker_map[matches[0]]
+                print(f"   🔍 Fuzzy matched '{company_lower}' to '{matches[0]}' -> {ticker}")
         
         if not ticker:
             # Try direct search with .NS suffix
@@ -418,8 +624,8 @@ def get_stock_data(company_name: str) -> Optional[StockData]:
         # Fetch data with configured session
         stock = yf.Ticker(ticker, session=session)
         
-        # Add small delay to avoid rapid requests
-        time.sleep(0.5)
+        # Add small delay to avoid rapid requests (increased to reduce 429 errors)
+        time.sleep(1.5)
         
         info = stock.info
         
@@ -430,6 +636,7 @@ def get_stock_data(company_name: str) -> Optional[StockData]:
         # Extract data
         current_price = info.get('currentPrice') or info.get('regularMarketPrice')
         market_cap = info.get('marketCap')
+        fifty_two_week_high = info.get('fiftyTwoWeekHigh')
         
         # Convert market cap to ₹ Crores
         if market_cap:
@@ -441,6 +648,7 @@ def get_stock_data(company_name: str) -> Optional[StockData]:
             ticker=ticker,
             current_price=current_price,
             market_cap=market_cap_crores,
+            fifty_two_week_high=fifty_two_week_high,
             is_listed=True
         )
         
@@ -622,16 +830,30 @@ def research_company(
         )
         for item in news_data
     ]
+    
+    # Generate LLM Status/Synthesis for News
+    if result.news_items:
+        print("\nSynthesizing news with LLM...")
+        summary = synthesize_news_with_groq(company_name, result.news_items)
+        if summary:
+            print("✓ News synthesis generated")
+            result.news_summary = summary
+        else:
+            print("✗ News synthesis failed")
 
-    # 2. MCA status lookup
-    print("\nLooking up MCA status...")
-    mca_status = lookup_mca_status(cin)
+    # 2. MCA status & attributes lookup
+    print("\nLooking up MCA status and attributes...")
+    mca_status, mca_data = lookup_mca_status(cin, company_name)
     if mca_status:
         print(f"✓ MCA Status: {mca_status}")
         result.mca_status = mca_status
+        if mca_data:
+            print("✓ Static attributes retrieved")
+            result.mca_data = mca_data
     else:
         print("✗ MCA status not found")
         result.mca_status = None
+        result.mca_data = None
 
     # 3. Stock data lookup
     print("\nFetching stock data...")

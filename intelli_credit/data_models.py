@@ -130,7 +130,9 @@ class FinancialData:
     gst_bank_gap_percent: Optional[float] = None
     
     # Period information
-    period_months: Optional[int] = None
+    period_months: Optional[int] = None  # legacy shared period
+    bank_period_months: Optional[int] = None  # period covered by bank statement
+    gst_period_months: Optional[int] = None  # period covered by GST return
     
     # Additional extracted fields
     ebit: Optional[float] = None
@@ -138,6 +140,9 @@ class FinancialData:
     total_credits_in_period: Optional[float] = None
     gst_turnover_period: Optional[float] = None
     zero_debt_flag: bool = False
+    
+    # User Inputs
+    cibil_cmr_rank: Optional[int] = None
     
     # Collateral
     collateral_value: Optional[float] = None
@@ -191,6 +196,8 @@ class FinancialData:
             "gstr_2a_itc": self.gstr_2a_itc,
             "gst_bank_gap_percent": self.gst_bank_gap_percent,
             "period_months": self.period_months,
+            "bank_period_months": self.bank_period_months,
+            "gst_period_months": self.gst_period_months,
             "ebit": self.ebit,
             "depreciation": self.depreciation,
             "total_credits_in_period": self.total_credits_in_period,
@@ -244,6 +251,7 @@ class StockData:
     ticker: Optional[str] = None
     current_price: Optional[float] = None
     market_cap: Optional[float] = None  # In ₹ Crores
+    fifty_two_week_high: Optional[float] = None
     is_listed: bool = False
     
     def to_dict(self) -> Dict[str, Any]:
@@ -252,6 +260,7 @@ class StockData:
             "ticker": self.ticker,
             "current_price": self.current_price,
             "market_cap": self.market_cap,
+            "fifty_two_week_high": self.fifty_two_week_high,
             "is_listed": self.is_listed
         }
 
@@ -266,7 +275,9 @@ class ResearchResult:
     sector_npa_rate: Optional[float] = None  # % NPA rate for sector
     
     news_items: List[NewsItem] = field(default_factory=list)
+    news_summary: Optional[str] = None  # AI synthesized summary of news
     mca_status: Optional[str] = None
+    mca_data: Optional[Dict[str, Any]] = None  # Static attributes from Kaggle or online
     stock_data: Optional[StockData] = None
     
     validation_status: str = "POTENTIAL_MATCH"  # Requires manual validation
@@ -278,7 +289,9 @@ class ResearchResult:
             "sector_outlook": self.sector_outlook,
             "sector_npa_rate": self.sector_npa_rate,
             "news_items": [item.to_dict() for item in self.news_items],
+            "news_summary": self.news_summary,
             "mca_status": self.mca_status,
+            "mca_data": self.mca_data,
             "stock_data": self.stock_data.to_dict() if self.stock_data else None,
             "validation_status": self.validation_status
         }
@@ -342,6 +355,9 @@ class ScoreResult:
     # Decision narrative (one-sentence summary from top 3 flags)
     decision_narrative: Optional[str] = None
     
+    # Score computation trails (per-C breakdown: Base → deductions → Final)
+    score_trails: Dict[str, List[str]] = field(default_factory=dict)
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
@@ -356,7 +372,8 @@ class ScoreResult:
             "interest_rate": self.interest_rate,
             "flags": [flag.to_dict() for flag in self.flags],
             "reasoning": self.reasoning,
-            "decision_narrative": self.decision_narrative
+            "decision_narrative": self.decision_narrative,
+            "score_trails": self.score_trails
         }
 
 
@@ -384,6 +401,9 @@ class CompanyData:
     processing_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     demo_mode: bool = False
     
+    # User Inputs
+    cibil_cmr_rank: Optional[int] = None
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
@@ -395,7 +415,8 @@ class CompanyData:
             "officer_notes": [note.to_dict() for note in self.officer_notes],
             "early_warnings": [warning.to_dict() for warning in self.early_warnings],
             "processing_timestamp": self.processing_timestamp,
-            "demo_mode": self.demo_mode
+            "demo_mode": self.demo_mode,
+            "cibil_cmr_rank": self.cibil_cmr_rank
         }
     
     @classmethod
@@ -470,7 +491,8 @@ class CompanyData:
             officer_notes=officer_notes,
             early_warnings=early_warnings,
             processing_timestamp=data.get("processing_timestamp", datetime.now().isoformat()),
-            demo_mode=data.get("demo_mode", False)
+            demo_mode=data.get("demo_mode", False),
+            cibil_cmr_rank=data.get("cibil_cmr_rank")
         )
 
 

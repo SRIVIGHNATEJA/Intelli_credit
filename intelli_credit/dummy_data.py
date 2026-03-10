@@ -15,7 +15,7 @@ from data_models import CompanyData, ScoreResult, Verdict
 
 DEMO_COMPANIES = {
     "IL&FS": {
-        "cin": "L65990MH1987PLC044571",
+        "cin": "U65990MH1987PLC042230",
         "company_name": "Infrastructure Leasing and Financial Services Limited",
         "expected_verdict": Verdict.REJECT,
         "cache_file": "ilfs_cache.json"
@@ -27,7 +27,7 @@ DEMO_COMPANIES = {
         "cache_file": "tcs_cache.json"
     },
     "Byju's": {
-        "cin": "U80903KA2011PTC061427",
+        "cin": "U80904KA2011PTC061427",
         "company_name": "Think & Learn Private Limited",
         "expected_verdict": Verdict.REJECT,
         "cache_file": "byjus_cache.json"

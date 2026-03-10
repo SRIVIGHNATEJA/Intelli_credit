@@ -6,14 +6,11 @@ CRITICAL: Uses exact thresholds from SCORER_CORRECTIONS.md
 """
 
 from typing import Tuple, List, Optional, Dict
-import os
-from groq import Groq
 
 from data_models import (
     CompanyData, FinancialData, ResearchResult, ScoreResult,
     FlagItem, FlagCategory, Severity, Verdict, create_flag
 )
-from prompts import get_sector_outlook_prompt
 
 
 # ============================================================================
@@ -83,12 +80,11 @@ def generate_reasoning(
     Returns:
         str: Reasoning text
     """
-    # Sort flags by severity and impact
+    # Sort flags by severity (HIGH first) and then by absolute impact (highest first)
     severity_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, "GREEN": 3}
     sorted_flags = sorted(
         flags,
-        key=lambda f: (severity_order.get(f.severity.value, 4), abs(f.impact_score)),
-        reverse=True
+        key=lambda f: (severity_order.get(f.severity.value, 4), -abs(f.impact_score))
     )
     
     # Build reasoning
@@ -141,6 +137,37 @@ def calculate_character_score(company_data: CompanyData) -> Tuple[float, List[Fl
             "System",
             -50.0
         )]
+    
+    # CIBIL CMR Rank Impact (Hackathon Requirement)
+    if company_data.cibil_cmr_rank is not None:
+        cmr = company_data.cibil_cmr_rank
+        if cmr <= 3:
+            score += 10
+            flags.append(create_flag(
+                FlagCategory.CHARACTER,
+                Severity.GREEN,
+                f"Strong CIBIL CMR Rank: {cmr} (Low Risk)",
+                "CIBIL Commercial",
+                10.0
+            ))
+        elif cmr <= 6:
+            score -= 15
+            flags.append(create_flag(
+                FlagCategory.CHARACTER,
+                Severity.MEDIUM,
+                f"Moderate CIBIL CMR Rank: {cmr} (Elevated Risk)",
+                "CIBIL Commercial",
+                -15.0
+            ))
+        else:
+            score -= 35
+            flags.append(create_flag(
+                FlagCategory.CHARACTER,
+                Severity.HIGH,
+                f"Poor CIBIL CMR Rank: {cmr} (High Risk of Default)",
+                "CIBIL Commercial",
+                -35.0
+            ))
     
     # NCLT/DRT civil cases: -10 per case
     if financials.nclt_cases > 0:
@@ -862,7 +889,14 @@ def calculate_conditions_score(sector: str, research: Optional[ResearchResult]) 
             15.0
         ))
     elif sector_outlook == "STABLE":
-        pass  # No adjustment
+        # Hackathon Fix: Emit a baseline flag so the 70/100 base score makes mathematical sense on the UI
+        flags.append(create_flag(
+            FlagCategory.CONDITIONS,
+            Severity.LOW,  # Neutralish
+            "Sector outlook: STABLE (baseline conditions applies 70/100 base score)",
+            "Market Research",
+            0.0
+        ))
     elif sector_outlook == "DECLINING":
         score -= 15
         flags.append(create_flag(
@@ -941,12 +975,16 @@ def determine_verdict(final_score: float, bank_credits_annual: Optional[float], 
         Dict with verdict, loan_amount, interest_rate
     """
     # CRITICAL FIX: Ensure proper comparison logic
-    if final_score >= 70.0:  # Changed from > to >= to handle edge case
+    if final_score >= 70.0:
         # APPROVE
         if bank_credits_annual is not None and loan_requested is not None:
             loan_amount = min(bank_credits_annual * 3.5, loan_requested)
-        else:
+        elif bank_credits_annual is not None:
+            loan_amount = round(bank_credits_annual * 3.5, 2)
+        elif loan_requested is not None:
             loan_amount = loan_requested
+        else:
+            loan_amount = None
         
         # Formula: 10.5% + (70 - score) * 0.1
         # For scores >= 70, this gives rates <= 10.5%
@@ -962,8 +1000,12 @@ def determine_verdict(final_score: float, bank_credits_annual: Optional[float], 
         # CONDITIONAL APPROVE
         if bank_credits_annual is not None and loan_requested is not None:
             loan_amount = min(bank_credits_annual * 2.0, loan_requested)
+        elif bank_credits_annual is not None:
+            loan_amount = round(bank_credits_annual * 2.0, 2)
+        elif loan_requested is not None:
+            loan_amount = round(loan_requested * 0.7, 2)
         else:
-            loan_amount = loan_requested * 0.7 if loan_requested else None
+            loan_amount = None
         
         # Formula: 10.5% + (70 - score) * 0.15
         interest_rate = 10.5 + ((70 - final_score) * 0.15)
@@ -999,6 +1041,42 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
     """
     all_flags = []
     
+    # TECHNICAL REJECT FAILSAFE: Immediate upstream reject if critical financials are missing
+    if company_data.financials:
+        missing_critical = []
+        if not company_data.financials.revenue:
+            missing_critical.append("Revenue")
+        if not company_data.financials.net_worth:
+            missing_critical.append("Net Worth")
+            
+        if missing_critical:
+            reject_flag = create_flag(
+                FlagCategory.CAPACITY,
+                Severity.HIGH,
+                f"TECHNICAL REJECT: Core financials completely missing ({', '.join(missing_critical)})",
+                "System Validation",
+                -90.0
+            )
+            all_flags.append(reject_flag)
+            
+            # Short-circuit exact formatting to match regular return signature
+            return ScoreResult(
+                total_score=10.0,  # Floor score geometrically
+                verdict=Verdict.REJECT,
+                flags=all_flags,
+                five_cs_scores={
+                    "CHARACTER": 10.0,
+                    "CAPACITY": 10.0,
+                    "CAPITAL": 10.0,
+                    "COLLATERAL": 10.0,
+                    "CONDITIONS": 10.0
+                },
+                reasoning=f"TECHNICAL REJECT: Core financials completely missing ({', '.join(missing_critical)}). Instant rejection executed. Bypass mode active.",
+                decision_narrative=reject_flag.description,
+                score_trails={"SYSTEM": ["Base: 100", f"-90.0: {reject_flag.description}", "Total: 10.0"]},
+                loan_term={"amount": None, "rate": None}
+            )
+    
     # Calculate each C score
     character_score, char_flags = calculate_character_score(company_data)
     all_flags.extend(char_flags)
@@ -1017,7 +1095,16 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
             gst_gap = None
         
         if gst_gap is not None:
-            if gst_gap >= 35:
+            if gst_gap >= 90:
+                # Extreme gap likely indicates data scale mismatch, not fraud
+                gst_flags.append(create_flag(
+                    FlagCategory.GST_FRAUD,
+                    Severity.LOW,
+                    f"GST/Bank gap {gst_gap:.1f}% — possible data scale mismatch (verify manually)",
+                    "GST vs Bank Cross-check",
+                    -5.0
+                ))
+            elif gst_gap >= 35:
                 gst_flags.append(create_flag(
                     FlagCategory.GST_FRAUD,
                     Severity.HIGH,
@@ -1121,11 +1208,10 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
         all_flags
     )
     
-    # Create decision narrative from top 3 flags
+    # Create decision narrative from top 3 flags (HIGH severity first, highest impact first)
     top_flags = sorted(
         all_flags,
-        key=lambda f: ({"HIGH": 0, "MEDIUM": 1, "LOW": 2, "GREEN": 3}.get(f.severity.value, 4), abs(f.impact_score)),
-        reverse=True
+        key=lambda f: ({"HIGH": 0, "MEDIUM": 1, "LOW": 2, "GREEN": 3}.get(f.severity.value, 4), -abs(f.impact_score))
     )[:3]
     
     if top_flags:
@@ -1133,6 +1219,25 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
         decision_narrative = "Key factors: " + "; ".join(narrative_parts)
     else:
         decision_narrative = "No significant flags detected"
+    
+    # Build score computation trails from flags
+    score_trails = {}
+    categories_map = {
+        "CHARACTER": (character_score, ["CHARACTER", "EARLY_WARNING"]),
+        "CAPACITY": (capacity_score, ["CAPACITY", "GST_FRAUD"]),
+        "CAPITAL": (capital_score, ["CAPITAL"]),
+        "COLLATERAL": (collateral_score, ["COLLATERAL"]),
+        "CONDITIONS": (conditions_score, ["CONDITIONS"]),
+    }
+    for c_name, (c_score, cat_list) in categories_map.items():
+        c_flags = [f for f in all_flags if f.category.value in cat_list]
+        base_val = 70 if c_name == "CONDITIONS" else 100
+        trail_lines = [f"Base: {base_val}"]
+        for f in c_flags:
+            sign = "+" if f.impact_score > 0 else ""
+            trail_lines.append(f"{sign}{f.impact_score:.0f}  {f.description}")
+        trail_lines.append(f"→ Final: {c_score:.1f} (floor: 10, ceiling: 100)")
+        score_trails[c_name] = trail_lines
     
     # Build ScoreResult
     return ScoreResult(
@@ -1147,7 +1252,8 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
         interest_rate=verdict_data["interest_rate"],
         flags=all_flags,
         reasoning=reasoning,
-        decision_narrative=decision_narrative
+        decision_narrative=decision_narrative,
+        score_trails=score_trails
     )
 
 
@@ -1227,10 +1333,11 @@ def validate_scorer_with_ilfs():
     )
     
     ilfs_data = CompanyData(
-        cin="L65990MH1987PLC044571",
+        cin="U65990MH1987PLC042230",
         company_name="IL&FS",
         financials=ilfs_financials,
         research=ilfs_research,
+        cibil_cmr_rank=8,  # High risk CIBIL to match IL&FS reality
         demo_mode=True
     )
     
@@ -1246,7 +1353,7 @@ def validate_scorer_with_ilfs():
     print(f"CAPITAL Score: {result.capital_score:.1f}/100 (Expected: ~10)")
     print(f"COLLATERAL Score: {result.collateral_score:.1f}/100 (Expected: ~40)")
     print(f"CONDITIONS Score: {result.conditions_score:.1f}/100 (Expected: ~35)")
-    print(f"\nTOTAL SCORE: {result.final_score:.1f}/100 (Expected: 13-18)")
+    print(f"\nTOTAL SCORE: {result.final_score:.1f}/100 (Expected: 10-18)")
     print(f"VERDICT: {result.verdict.value} (Expected: REJECT)")
     
     # Validate ranges
@@ -1255,7 +1362,7 @@ def validate_scorer_with_ilfs():
     assert 8 <= result.capital_score <= 15, f"CAPITAL score {result.capital_score} out of expected range"
     assert 35 <= result.collateral_score <= 50, f"COLLATERAL score {result.collateral_score} out of expected range"
     assert 15 <= result.conditions_score <= 40, f"CONDITIONS score {result.conditions_score} out of expected range"
-    assert 13 <= result.final_score <= 20, f"TOTAL score {result.final_score} out of expected range (13-20)"
+    assert 10 <= result.final_score <= 20, f"TOTAL score {result.final_score} out of expected range (10-20)"
     assert result.verdict == Verdict.REJECT, f"Verdict should be REJECT, got {result.verdict.value}"
     
     print("\n✅ All validations PASSED!")

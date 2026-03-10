@@ -94,11 +94,12 @@ def test_ilfs_cam_generation():
     
     # Create company data
     ilfs_data = CompanyData(
-        cin="L65990MH1987PLC044571",
+        cin="U65990MH1987PLC042230",
         company_name="IL&FS",
         promoter_name="Ravi Parthasarathy",
         financials=ilfs_financials,
         research=ilfs_research,
+        cibil_cmr_rank=8,  # Included for backwards compatibility with the new feature
         demo_mode=True
     )
     

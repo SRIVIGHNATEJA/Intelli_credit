@@ -246,10 +246,9 @@ count months this statement covers.
 Jan-Mar = 3, full year = 12, one month = 1.
 This is required for annualisation>,
   "total_credits_in_period": <float in ₹ Crores or null,
-sum of ALL credits shown in statement.
-This is the raw period total, NOT annualised>,
+CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of floats (e.g., [100.0, 50.0]). Python will do the math.>,
   "total_debits_in_period": <float in ₹ Crores or null,
-sum of ALL debits shown. Raw period total>,
+CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of floats (e.g., [100.0, 50.0]). Python will do the math.>,
   "cheque_bounces_count": <int or null,
 return 0 if explicitly stated as 0 or NIL.
 return null if not mentioned at all.
@@ -286,9 +285,9 @@ GSTR-3B monthly = 1,
 GSTR-9 annual = 12,
 quarterly = 3>,
   "gst_turnover_period": <float in ₹ Crores or null,
-raw turnover for THIS PERIOD only.
-Look for: Total Supplies, Total Taxable Value.
-Do NOT annualise. Return raw figure only>,
+CRITICAL: Identify "TOTAL SUPPLIES" or "Total Taxable Value".
+Extract the sum of all outward taxable supplies (Domestic + Zero Rated)
+from table 1. CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of floats (e.g., [100.0, 50.0]). Python will do the math.>,
   "gstr_3b_itc": <float in ₹ Crores or null,
 NET ITC after reversals.
 Sum of IGST + CGST + SGST net ITC.

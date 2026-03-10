@@ -70,7 +70,26 @@ def check_gst_bank_mismatch(
         return None
     
     # Apply CORRECTED thresholds from SCORER_CORRECTIONS.md
-    if gap >= 35.0:
+    if gap >= 90.0:
+        if bank_credits_annual == 0.0 and gst_turnover > 0:
+            # Hackathon Data Fix: If bank credits are precisely zero but GST is healthy, it's an extraction failure, not fraud.
+            return create_flag(
+                category=FlagCategory.GST_FRAUD,
+                severity=Severity.LOW,
+                description=f"GST turnover is ₹{gst_turnover:.2f} Cr but Bank Credits were extracted as ₹0.0 Cr. (LLM parsing anomaly, please manually verify Bank Statement total).",
+                source="Extraction Validation",
+                impact=0.0
+            )
+        
+        # Extreme gap likely indicates data scale mismatch
+        return create_flag(
+            category=FlagCategory.GST_FRAUD,
+            severity=Severity.LOW,
+            description=f"GST turnover exceeds bank credits by {gap:.1f}% — possible data scale mismatch (verify manually)",
+            source="GST Returns vs Bank Statements",
+            impact=-5.0
+        )
+    elif gap >= 35.0:
         return create_flag(
             category=FlagCategory.GST_FRAUD,
             severity=Severity.HIGH,
