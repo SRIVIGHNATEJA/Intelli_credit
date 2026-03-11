@@ -154,7 +154,7 @@ def add_company_overview(doc: Document, company_data: CompanyData) -> None:
         ["CIN", company_data.cin],
         ["Promoter Name", company_data.promoter_name if company_data.promoter_name else "N/A"],
         ["Sector", company_data.research.sector if company_data.research else "N/A"],
-        ["MCA Status", company_data.financials.mca_status if company_data.financials and company_data.financials.mca_status else "N/A"],
+        ["MCA Status", company_data.research.mca_status if company_data.research else "N/A"],
         ["Listed Status", "Yes" if company_data.research and company_data.research.stock_data and company_data.research.stock_data.is_listed else "No"]
     ]
     

@@ -102,22 +102,24 @@ CURRENT LIABILITIES (look for ANY of these terms):
 - "Current Maturities of Long Term Debt"
 - "Provisions", "Accrued Expenses"
 
+CRITICAL: Extract ALL monetary numbers as raw STRINGS exactly as they appear in the document. Do NOT convert to floats, do NOT remove commas, and do NOT write mathematical expressions. Example: If you see '64,058.00', return exactly "64,058.00". If you see '1,59,629', return exactly "1,59,629".
+
 Extract these fields (use null if not found, DO NOT GUESS):
 {{
-  "total_assets": <float in ₹ Crores or null>,
-  "total_liabilities": <float in ₹ Crores or null>,
-  "net_worth": <float in ₹ Crores or null>,
-  "current_assets": <float in ₹ Crores or null>,
-  "current_liabilities": <float in ₹ Crores or null>,
-  "long_term_debt": <float in ₹ Crores or null,
+  "total_assets": <string in ₹ Crores or null>,
+  "total_liabilities": <string in ₹ Crores or null>,
+  "net_worth": <string in ₹ Crores or null>,
+  "current_assets": <string in ₹ Crores or null>,
+  "current_liabilities": <string in ₹ Crores or null>,
+  "long_term_debt": <string in ₹ Crores or null,
 look for: Long-term Debt, Long-term Borrowings,
 Term Loans, Non-current Borrowings, Debentures.
-If document says zero long-term debt return 0.0.
+If document says zero long-term debt return "0".
 Do NOT include lease liabilities>,
-  "short_term_borrowings": <float in ₹ Crores or null,
+  "short_term_borrowings": <string in ₹ Crores or null,
 look for: Short-term Borrowings, Current Borrowings,
 Working Capital Loans, Cash Credit, OD limit>,
-  "equity": <float in ₹ Crores or null, same as net_worth>,
+  "equity": <string in ₹ Crores or null, same as net_worth>,
   "zero_debt_flag": <boolean, true ONLY if document
 explicitly states debt-free or zero long-term debt,
 false otherwise>,
@@ -173,24 +175,26 @@ DEPRECIATION (look for ANY of these terms):
 - "Amortization", "Depreciation on Fixed Assets"
 - "Wear and Tear", "Asset Write-off"
 
+CRITICAL: Extract ALL monetary numbers as raw STRINGS exactly as they appear in the document. Do NOT convert to floats, do NOT remove commas, and do NOT write mathematical expressions. Example: If you see '64,058.00', return exactly "64,058.00".
+
 Extract these fields (use null if not found, DO NOT GUESS):
 {{
-  "revenue": <float in ₹ Crores or null>,
-  "ebit": <float in ₹ Crores or null,
+  "revenue": <string in ₹ Crores or null>,
+  "ebit": <string in ₹ Crores or null,
 look for: EBIT, Operating Profit,
 Profit before Interest and Tax,
 Earnings before Interest and Tax>,
-  "net_profit": <float in ₹ Crores or null>,
-  "ebitda": <float in ₹ Crores or null,
+  "net_profit": <string in ₹ Crores or null>,
+  "ebitda": <string in ₹ Crores or null,
 ONLY if explicitly labeled EBITDA.
 Do not compute. Return null if not labeled>,
-  "finance_cost": <float in ₹ Crores or null,
+  "finance_cost": <string in ₹ Crores or null,
 look for: Finance Cost, Finance Costs,
 Interest Expense, Interest on Borrowings,
 Borrowing Costs, Financial Expenses.
 NOTE: "Finance Cost" IS interest expense in India>,
-  "depreciation": <float in ₹ Crores or null>,
-  "tax": <float in ₹ Crores or null>,
+  "depreciation": <string in ₹ Crores or null>,
+  "tax": <string in ₹ Crores or null>,
   "year": <int or null>
 }}
 
@@ -237,6 +241,8 @@ OVERDRAFT (look for ANY of these terms):
 - "Drawing Power", "Sanctioned Limit", "Credit Limit"
 - "Overdrawn", "Negative Balance", "Debit Balance"
 
+CRITICAL: Extract ALL monetary numbers as raw STRINGS exactly as they appear in the document. Do NOT convert to floats, do NOT remove commas, and do NOT write mathematical expressions. Example: If you see '60,400.00', return exactly "60,400.00".
+
 Extract these fields (use null if not found, DO NOT GUESS):
 {{
   "period_start": <string or null, YYYY-MM-DD>,
@@ -245,16 +251,16 @@ Extract these fields (use null if not found, DO NOT GUESS):
 count months this statement covers.
 Jan-Mar = 3, full year = 12, one month = 1.
 This is required for annualisation>,
-  "total_credits_in_period": <float in ₹ Crores or null,
-CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of floats (e.g., [100.0, 50.0]). Python will do the math.>,
-  "total_debits_in_period": <float in ₹ Crores or null,
-CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of floats (e.g., [100.0, 50.0]). Python will do the math.>,
+  "total_credits_in_period": <string in ₹ Crores or null,
+CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of strings (e.g., ["19,850.00", "20,100.00"]). Python will do the math.>,
+  "total_debits_in_period": <string in ₹ Crores or null,
+CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of strings (e.g., ["19,187.00", "20,000.00"]). Python will do the math.>,
   "cheque_bounces_count": <int or null,
 return 0 if explicitly stated as 0 or NIL.
 return null if not mentioned at all.
 do NOT infer from conduct remarks>,
-  "od_limit": <float in ₹ Crores or null>,
-  "od_utilized": <float in ₹ Crores or null>,
+  "od_limit": <string in ₹ Crores or null>,
+  "od_utilized": <string in ₹ Crores or null>,
   "account_conduct": <string or null,
 any explicit conduct rating mentioned>
 }}
@@ -275,6 +281,8 @@ Extract GST data from this GST Return and return ONLY valid JSON.
 Text:
 {text}
 
+CRITICAL: Extract ALL monetary numbers as raw STRINGS exactly as they appear in the document. Do NOT convert to floats, do NOT remove commas, and do NOT write mathematical expressions. Example: If you see '20,210.00', return exactly "20,210.00".
+
 Extract these fields (use null if not found, DO NOT GUESS):
 {{
   "return_type": <string or null,
@@ -284,15 +292,15 @@ Extract these fields (use null if not found, DO NOT GUESS):
 GSTR-3B monthly = 1,
 GSTR-9 annual = 12,
 quarterly = 3>,
-  "gst_turnover_period": <float in ₹ Crores or null,
+  "gst_turnover_period": <string in ₹ Crores or null,
 CRITICAL: Identify "TOTAL SUPPLIES" or "Total Taxable Value".
 Extract the sum of all outward taxable supplies (Domestic + Zero Rated)
-from table 1. CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of floats (e.g., [100.0, 50.0]). Python will do the math.>,
-  "gstr_3b_itc": <float in ₹ Crores or null,
+from table 1. CRITICAL: NEVER PERFORM ARITHMETIC. NEVER use the '+' sign. If a summary total is missing and you see multiple individual entries, return them strictly as a JSON list of strings (e.g., ["8,450.00", "11,625.00"]). Python will do the math.>,
+  "gstr_3b_itc": <string in ₹ Crores or null,
 NET ITC after reversals.
 Sum of IGST + CGST + SGST net ITC.
 Only present in GSTR-3B documents>,
-  "gstr_2a_itc": <float in ₹ Crores or null,
+  "gstr_2a_itc": <string in ₹ Crores or null,
 CRITICAL: GSTR-2A data NEVER appears in
 a GSTR-3B document. They are different returns.
 Set null for GSTR-3B. Only set if document
@@ -313,10 +321,12 @@ Extract income tax data from this ITR and return ONLY valid JSON.
 Text:
 {text}
 
+CRITICAL: Extract ALL monetary numbers as raw STRINGS exactly as they appear in the document. Do NOT convert to floats, do NOT remove commas.
+
 Extract these fields (use null if not found, DO NOT GUESS):
 {{
-  "gross_total_income": <float in ₹ Crores or null>,
-  "total_tax_paid": <float in ₹ Crores or null>,
+  "gross_total_income": <string in ₹ Crores or null>,
+  "total_tax_paid": <string in ₹ Crores or null>,
   "assessment_year": <string or null, e.g., "2023-24">,
   "filing_date": <string or null, YYYY-MM-DD>
 }}
@@ -332,10 +342,12 @@ Extract loan sanction details from this Sanction Letter and return ONLY valid JS
 Text:
 {text}
 
+CRITICAL: Extract ALL monetary numbers as raw STRINGS exactly as they appear in the document. Do NOT convert to floats, do NOT remove commas.
+
 Extract these fields (use null if not found, DO NOT GUESS):
 {{
-  "sanctioned_amount": <float in ₹ Crores or null>,
-  "interest_rate": <float or null, percentage>,
+  "sanctioned_amount": <string in ₹ Crores or null>,
+  "interest_rate": <string or null, percentage>,
   "tenure_months": <int or null>,
   "sanction_date": <string or null, YYYY-MM-DD>,
   "lender_name": <string or null>
@@ -564,4 +576,5 @@ def get_system_message() -> str:
     """
     return """You are a financial data extraction assistant for Indian corporate lending. 
 You ALWAYS return valid JSON and nothing else. You understand Indian financial terminology 
-and convert all monetary values to ₹ Crores for consistency."""
+and report all monetary values in ₹ Crores for consistency.
+CRITICAL: Extract ALL numbers as raw STRINGS exactly as they appear in the document. Do NOT convert to floats, do NOT remove commas, and do NOT write mathematical expressions. Example: If you see '64,058.00', return exactly "64,058.00"."""

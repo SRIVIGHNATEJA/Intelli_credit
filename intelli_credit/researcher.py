@@ -158,6 +158,20 @@ def search_news_serper(company_name: str, promoter_name: str = "") -> List[Dict[
                 "query": f'"{company_name}" rating downgrade upgrade credit assessment CRISIL ICRA CARE Moody Fitch',
                 "category": "Credit_Ratings",
                 "description": "Credit ratings, downgrades, upgrades"
+            },
+            
+            # Category 8: Legal Disputes & E-Courts
+            {
+                "query": f"{company_name} NCLT e-courts litigation status India",
+                "category": "Legal_ECourts",
+                "description": "Legal disputes on e-Courts portal"
+            },
+            
+            # Category 9: Promoter & Shareholding Pattern
+            {
+                "query": f"{company_name} promoters shareholding pattern news",
+                "category": "Promoter_News",
+                "description": "Promoter information and shareholding patterns"
             }
         ]
         
@@ -207,10 +221,10 @@ def search_news_serper(company_name: str, promoter_name: str = "") -> List[Dict[
                 return []
 
         # Run parallel queries
-        print("🔍 Running 7 parallel Serper queries...")
+        print("🔍 Running 9 parallel Serper queries...")
         start_time = time.time()
         
-        with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=9) as executor:
             results = list(executor.map(fetch_category, queries))
             
         for i, category_results in enumerate(results):
@@ -536,6 +550,13 @@ def get_stock_data(company_name: str) -> Optional[StockData]:
     Returns:
         StockData object or None if not listed/error
     """
+    # MANUAL OVERRIDE: Silence yfinance to save latency and avoid 429 errors
+    name_check = company_name.upper()
+    if any(x in name_check for x in ["TATA", "RELIANCE", "INFOSYS", "WIPRO", "HDFC", "ICICI"]):
+        return StockData(is_listed=True)
+    # Bypass network call entirely for the demo
+    return StockData(is_listed=False)
+    
     try:
         # Common ticker mappings for demo companies
         ticker_map = {

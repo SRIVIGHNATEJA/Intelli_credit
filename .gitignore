@@ -20,6 +20,8 @@ ENV/
 *.swp
 *.swo
 *~
+*.md
+
 
 # OS
 .DS_Store

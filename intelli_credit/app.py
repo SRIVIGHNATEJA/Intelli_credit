@@ -843,7 +843,7 @@ def page_credit_analysis():
     
     with m4:
         # FIX: Check for None explicitly, not falsy (0.0 is valid)
-        loan_amt = f"₹{score_result.loan_amount:.1f}Cr" if score_result.loan_amount is not None else "REJECTED"
+        loan_amt = f"₹{score_result.loan_amount:,.0f} Cr" if score_result.loan_amount is not None else "REJECTED"
         border = "#10b981" if score_result.loan_amount is not None else "#ef4444"
         render_metric_card("Approved Amount", loan_amt, "✅" if score_result.loan_amount is not None else "❌", border)
     
@@ -907,7 +907,7 @@ def page_credit_analysis():
     with tab1:
         if score_result.decision_narrative:
             st.markdown("""
-            <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); 
+            <div style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); 
                         padding: 1.5rem; border-radius: 12px; border-left: 5px solid #667eea;
                         margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
                 <div style="color: #667eea; font-size: 0.85rem; font-weight: 700; 
@@ -929,7 +929,12 @@ def page_credit_analysis():
                     🔍 Detailed Analysis
                 </div>
             """, unsafe_allow_html=True)
-            st.text_area("Detailed Analysis", value=score_result.reasoning, height=200, disabled=True, label_visibility="collapsed")
+            st.markdown(f"""
+            <div style="background: #f8fafc; padding: 1.2rem; border-radius: 8px;
+                        border: 1px solid #e2e8f0; font-family: 'Courier New', monospace;
+                        font-size: 0.85rem; line-height: 1.7; color: #334155;
+                        max-height: 300px; overflow-y: auto; white-space: pre-wrap;">{score_result.reasoning}</div>
+            """, unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("""

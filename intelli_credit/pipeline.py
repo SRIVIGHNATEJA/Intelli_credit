@@ -10,6 +10,7 @@ CRITICAL SAFEGUARDS:
 
 import os
 import logging
+import re
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
@@ -29,6 +30,29 @@ from dummy_data import load_demo_cache as load_demo_cache_from_registry
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def safe_float_convert(val):
+    """Safely convert LLM-extracted string values to float.
+    Returns None for missing/invalid data so downstream None-checks work.
+    Handles commas, currency symbols, dirty suffixes, and list inputs."""
+    if val is None or str(val).strip().lower() in ['null', 'none', 'nil', 'na', 'n/a', '-', '']:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, list):
+        valid_vals = [safe_float_convert(v) for v in val]
+        valid_vals = [v for v in valid_vals if v is not None]
+        return sum(valid_vals) if valid_vals else None
+    try:
+        clean_str = str(val).replace(',', '')
+        # Extract the first continuous sequence of numbers and decimals
+        matches = re.findall(r'-?\d+\.?\d*', clean_str)
+        if matches:
+            return float(matches[0])
+        return None
+    except Exception:
+        return None
 
 
 # ============================================================================
@@ -87,16 +111,22 @@ def compute_derived_fields(financials: FinancialData) -> FinancialData:
         credits = getattr(financials, 'total_credits_in_period', None)
         # Use bank-specific period, fall back to shared period_months
         months = financials.bank_period_months or financials.period_months
-        if credits and months and months > 0:
-            financials.bank_credits_annual = round(credits / months * 12, 2)
+        if credits is not None and months and months > 0:
+            # Handle LLM returning a list of individual entries instead of a sum
+            credit_val = sum(credits) if isinstance(credits, list) else credits
+            if credit_val:
+                financials.bank_credits_annual = round(credit_val / months * 12, 2)
     
     # GST TURNOVER ANNUAL = Period Turnover / Months * 12
     if financials.gst_turnover_annual is None:
         turnover = getattr(financials, 'gst_turnover_period', None)
         # Use GST-specific period, fall back to shared period_months
         months = financials.gst_period_months or financials.period_months
-        if turnover and months and months > 0:
-            financials.gst_turnover_annual = round(turnover / months * 12, 2)
+        if turnover is not None and months and months > 0:
+            # Handle LLM returning a list of individual entries instead of a sum
+            turnover_val = sum(turnover) if isinstance(turnover, list) else turnover
+            if turnover_val:
+                financials.gst_turnover_annual = round(turnover_val / months * 12, 2)
     
     # GST-BANK GAP %
     if financials.gst_bank_gap_percent is None:
@@ -104,6 +134,9 @@ def compute_derived_fields(financials: FinancialData) -> FinancialData:
         bank = financials.bank_credits_annual
         if gst and bank and gst > 0:
             financials.gst_bank_gap_percent = round(abs(gst - bank) / gst * 100, 2)
+    
+    # INTEREST COVERAGE RATIO = EBITDA / Finance Cost
+    financials.interest_coverage = round(financials.ebitda / financials.finance_cost, 2) if financials.ebitda and financials.finance_cost and financials.finance_cost > 0 else None
     
     return financials
 
@@ -228,41 +261,41 @@ def _map_extracted_to_financials(
         if doc_type == "balance_sheet":
             # Balance sheet data
             if "net_worth" in extracted:
-                nw = extracted["net_worth"]
-                financials.net_worth = [nw] if isinstance(nw, float) else nw
+                nw = safe_float_convert(extracted["net_worth"])
+                financials.net_worth = [nw] if isinstance(nw, (int, float)) else nw
             if "long_term_debt" in extracted:
-                financials.long_term_debt = extracted["long_term_debt"]
+                financials.long_term_debt = safe_float_convert(extracted["long_term_debt"])
             if "short_term_borrowings" in extracted:
-                financials.short_term_borrowings = extracted["short_term_borrowings"]
+                financials.short_term_borrowings = safe_float_convert(extracted["short_term_borrowings"])
             if "zero_debt_flag" in extracted:
                 financials.zero_debt_flag = extracted["zero_debt_flag"]
             if "current_assets" in extracted and "current_liabilities" in extracted:
-                ca = extracted["current_assets"]
-                cl = extracted["current_liabilities"]
+                ca = safe_float_convert(extracted["current_assets"])
+                cl = safe_float_convert(extracted["current_liabilities"])
                 if ca and cl and cl > 0:
                     financials.current_ratio = round(ca / cl, 2)
         
         elif doc_type == "profit_loss":
             # P&L data
             if "revenue" in extracted:
-                rev = extracted["revenue"]
-                financials.revenue = [rev] if isinstance(rev, float) else rev
+                rev = safe_float_convert(extracted["revenue"])
+                financials.revenue = [rev] if isinstance(rev, (int, float)) else rev
             if "net_profit" in extracted:
-                np_ = extracted["net_profit"]
-                financials.net_profit = [np_] if isinstance(np_, float) else np_
+                np_ = safe_float_convert(extracted["net_profit"])
+                financials.net_profit = [np_] if isinstance(np_, (int, float)) else np_
             if "ebitda" in extracted:
-                financials.ebitda = extracted["ebitda"]
+                financials.ebitda = safe_float_convert(extracted["ebitda"])
             if "ebit" in extracted:
-                financials.ebit = extracted["ebit"]
+                financials.ebit = safe_float_convert(extracted["ebit"])
             if "finance_cost" in extracted:
-                financials.finance_cost = extracted["finance_cost"]
+                financials.finance_cost = safe_float_convert(extracted["finance_cost"])
             if "depreciation" in extracted:
-                financials.depreciation = extracted["depreciation"]
+                financials.depreciation = safe_float_convert(extracted["depreciation"])
         
         elif doc_type == "bank_statements":
             # Bank statement data
             if "total_credits_in_period" in extracted:
-                financials.total_credits_in_period = extracted["total_credits_in_period"]
+                financials.total_credits_in_period = safe_float_convert(extracted["total_credits_in_period"])
             if "period_months" in extracted:
                 financials.bank_period_months = extracted["period_months"]
                 if not financials.period_months:
@@ -271,43 +304,44 @@ def _map_extracted_to_financials(
                 val = extracted["cheque_bounces_count"]
                 financials.cheque_bounces_count = val if val is not None else 0
             if "od_limit" in extracted and "od_utilized" in extracted:
-                limit = extracted["od_limit"]
-                used = extracted["od_utilized"]
+                limit = safe_float_convert(extracted["od_limit"])
+                used = safe_float_convert(extracted["od_utilized"])
                 if limit and used and limit > 0:
                     financials.od_utilization_percent = round(used/limit*100, 1)
         
         elif doc_type == "gst_returns":
             # GST data
             if "gst_turnover_period" in extracted:
-                financials.gst_turnover_period = extracted["gst_turnover_period"]
+                financials.gst_turnover_period = safe_float_convert(extracted["gst_turnover_period"])
             if "period_months" in extracted:
                 financials.gst_period_months = extracted["period_months"]
                 if not financials.period_months:
                     financials.period_months = extracted["period_months"]
             if "gstr_3b_itc" in extracted:
-                financials.gstr_3b_itc = extracted["gstr_3b_itc"]
+                financials.gstr_3b_itc = safe_float_convert(extracted["gstr_3b_itc"])
             if "gstr_2a_itc" in extracted:
-                financials.gstr_2a_itc = extracted["gstr_2a_itc"]
+                raw_2a = extracted.get("gstr_2a_itc")
+                financials.gstr_2a_itc = None if raw_2a is None or str(raw_2a).strip().lower() in ['null', 'none'] else safe_float_convert(raw_2a)
         
         elif doc_type == "itr":
             # ITR data (may overlap with P&L)
             if "revenue" in extracted and (not financials.revenue or len(financials.revenue) == 0):
-                financials.revenue = extracted["revenue"]
+                financials.revenue = safe_float_convert(extracted["revenue"])
             if "net_profit" in extracted and not financials.net_profit:
-                financials.net_profit = extracted["net_profit"]
+                financials.net_profit = safe_float_convert(extracted["net_profit"])
         
         elif doc_type == "sanction_letter":
             # Sanction letter data
             if "loan_requested" in extracted:
-                financials.loan_requested = extracted["loan_requested"]
+                financials.loan_requested = safe_float_convert(extracted["loan_requested"])
             if "collateral_value" in extracted:
-                financials.collateral_value = extracted["collateral_value"]
+                financials.collateral_value = safe_float_convert(extracted["collateral_value"])
             if "collateral_type" in extracted:
                 financials.collateral_type = extracted["collateral_type"]
             if "guarantee_type" in extracted:
                 financials.guarantee_type = extracted["guarantee_type"]
             if "dscr" in extracted:
-                financials.dscr = extracted["dscr"]
+                financials.dscr = safe_float_convert(extracted["dscr"])
         
         # Common fields that may appear in multiple documents
         if "audit_opinion" in extracted:

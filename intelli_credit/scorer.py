@@ -435,6 +435,14 @@ def calculate_capacity_score(financials: FinancialData, gst_flags: List[FlagItem
         ))
     
     # Revenue YoY Growth
+    if financials.revenue and len(financials.revenue) == 1:
+        flags.append(create_flag(
+            FlagCategory.CAPACITY,
+            Severity.LOW,
+            "Single-year revenue data — YoY trend analysis skipped (multi-year data improves accuracy)",
+            "Data Completeness",
+            0.0
+        ))
     if financials.revenue and len(financials.revenue) >= 2:
         rev = financials.revenue
         
@@ -638,6 +646,14 @@ def calculate_capital_score(financials: FinancialData) -> Tuple[float, List[Flag
         ))
     
     # Net Worth trend
+    if financials.net_worth and len(financials.net_worth) == 1:
+        flags.append(create_flag(
+            FlagCategory.CAPITAL,
+            Severity.LOW,
+            "Single-year net worth data — trend analysis skipped (multi-year data improves accuracy)",
+            "Data Completeness",
+            0.0
+        ))
     if financials.net_worth and len(financials.net_worth) >= 2:
         nw = financials.net_worth
         
