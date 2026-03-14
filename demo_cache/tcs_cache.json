@@ -2,39 +2,27 @@
   "company_data": {
     "cin": "L22210MH1995PLC084781",
     "company_name": "Tata Consultancy Services Limited",
-    "promoter_name": "Promoter of Tata Consultancy Services Limited",
+    "promoter_name": "Tata Sons Private Limited",
     "financials": {
-      "revenue": [
-        164000.0,
-        156000.0,
-        146000.0
-      ],
-      "net_profit": [
-        38500.0,
-        36000.0,
-        32400.0
-      ],
-      "ebitda": 52000.0,
-      "dscr": 8.5,
-      "interest_coverage": 45.0,
-      "total_debt": 2500.0,
-      "net_worth": [
-        85000.0,
-        78000.0,
-        72000.0
-      ],
-      "current_ratio": 2.8,
-      "debt_equity_ratio": 0.2,
-      "promoter_contribution_pct": 72.0,
+      "revenue": [198000.0, 164000.0, 156000.0],
+      "net_profit": [46500.0, 38500.0, 36000.0],
+      "ebitda": 62000.0,
+      "dscr": 12.5,
+      "interest_coverage": 85.0,
+      "total_debt": 1800.0,
+      "net_worth": [98000.0, 85000.0, 78000.0],
+      "current_ratio": 3.2,
+      "debt_equity_ratio": 0.02,
+      "promoter_contribution_pct": 72.3,
       "promoter_pledge_pct": 0.0,
       "cheque_bounces_count": 0,
-      "od_utilization_percent": 15.0,
-      "bank_credits_annual": 180000.0,
-      "gst_turnover_annual": 164000.0,
-      "gstr_3b_itc": 8200.0,
-      "gstr_2a_itc": 8150.0,
-      "collateral_value": 120000.0,
-      "collateral_type": "Property",
+      "od_utilization_percent": 8.0,
+      "bank_credits_annual": 210000.0,
+      "gst_turnover_annual": 198000.0,
+      "gstr_3b_itc": 9400.0,
+      "gstr_2a_itc": 9400.0,
+      "collateral_value": 150000.0,
+      "collateral_type": "Cash/Fixed Deposits",
       "guarantee_type": "Corporate",
       "loan_requested": 5000.0,
       "audit_opinion": "Clean",
@@ -50,106 +38,93 @@
       "rating_downgrade_months": null
     },
     "research": {
-      "sector": "IT Services",
-      "sector_outlook": "STABLE",
-      "sector_npa_rate": 0.8,
+      "sector": "IT Services & AI Consulting",
+      "sector_outlook": "POSITIVE",
+      "sector_npa_rate": 0.4,
       "news_items": [
         {
-          "title": "TCS Reports Strong Q4 Results, Revenue Grows 16.8%",
-          "source": "Economic Times",
-          "date": "2023-10-12",
-          "url": "https://economictimes.indiatimes.com/tcs-results",
-          "snippet": "Tata Consultancy Services reported robust growth in revenue..."
+          "title": "TCS Secures $3.5 Billion Sovereign Cloud Deal in Europe",
+          "source": "Financial Times",
+          "date": "2026-02-15",
+          "url": "https://ft.com/tcs-cloud",
+          "snippet": "TCS consolidates global leadership in digital infrastructure with record-breaking contract..."
         },
         {
-          "title": "TCS Wins Major Digital Transformation Deal",
-          "source": "Business Standard",
-          "date": "2023-09-28",
-          "url": "https://business-standard.com/tcs-deal",
-          "snippet": "The IT giant secured a multi-year contract worth $2.25 billion..."
+          "title": "TCS AI Labs Announces Breakthrough in Autonomous Enterprise Agents",
+          "source": "TechCrunch",
+          "date": "2026-03-01",
+          "url": "https://techcrunch.com/tcs-ai",
+          "snippet": "Company deploys 50,000+ specialized LLM agents for Fortune 500 clients..."
         },
         {
-          "title": "TCS Expands AI and Cloud Capabilities",
-          "source": "Mint",
-          "date": "2023-09-05",
-          "url": "https://livemint.com/tcs-ai-cloud",
-          "snippet": "Company invests heavily in artificial intelligence and cloud services..."
+          "title": "Tata Group Net Worth Surpasses Historic Milestones",
+          "source": "Bloomberg",
+          "date": "2026-03-10",
+          "url": "https://bloomberg.com/tata-growth",
+          "snippet": "Unmatched promoter stability and governance standards continue to drive TCS valuations..."
         }
       ],
       "mca_status": "Active",
       "stock_data": {
         "ticker": "TCS.NS",
-        "current_price": 3450.75,
-        "market_cap": 1250000.0,
+        "current_price": 4820.50,
+        "market_cap": 1850000.0,
         "is_listed": true
       },
-      "validation_status": "POTENTIAL_MATCH"
+      "validation_status": "VERIFIED_AAA"
     },
     "officer_notes": [
       {
-        "note_text": "Excellent corporate governance and transparent reporting. Strong management track record.",
+        "note_text": "Highest tier of corporate governance. Zero litigation history and robust cash reserves.",
         "affected_c": "CHARACTER",
-        "adjustment": 2.0,
-        "timestamp": "2026-03-10T13:00:47.951293"
+        "adjustment": 5.0,
+        "timestamp": "2026-03-12T22:45:00.00"
       },
       {
-        "note_text": "Diversified client base and strong recurring revenue model. Minimal customer concentration risk.",
+        "note_text": "Exceptional interest coverage ratio (85x). Bank credit to GST turnover correlation is perfect (1.06).",
         "affected_c": "CAPACITY",
-        "adjustment": 3.0,
-        "timestamp": "2026-03-10T13:00:47.951300"
-      },
-      {
-        "note_text": "Conservative capital structure with minimal debt. Strong cash generation and dividend history.",
-        "affected_c": "CAPITAL",
-        "adjustment": 1.0,
-        "timestamp": "2026-03-10T13:00:47.951302"
+        "adjustment": 5.0,
+        "timestamp": "2026-03-12T22:45:00.00"
       }
     ],
     "early_warnings": [],
-    "processing_timestamp": "2026-03-10T13:00:47.951308",
+    "processing_timestamp": "2026-03-12T22:45:00.00",
     "demo_mode": true
   },
   "score_result": {
     "character_score": 100.0,
-    "capacity_score": 95.0,
+    "capacity_score": 98.0,
     "capital_score": 100.0,
     "collateral_score": 100.0,
-    "conditions_score": 75.0,
-    "final_score": 96.0,
+    "conditions_score": 95.0,
+    "final_score": 98.5,
     "verdict": "APPROVE",
     "loan_amount": 5000.0,
-    "interest_rate": "7.90% p.a.",
+    "interest_rate": "7.25% p.a.",
     "flags": [
       {
-        "category": "CHARACTER",
-        "severity": "GREEN",
-        "description": "Clean audit opinion",
-        "source": "Audit Report",
-        "impact_score": 5.0
-      },
-      {
         "category": "CAPACITY",
-        "severity": "LOW",
-        "description": "Revenue growth 5.1% (moderate)",
-        "source": "Financial Statements",
-        "impact_score": -5.0
+        "severity": "GREEN",
+        "description": "Perfect Bank-GST correlation (1.06x). No circular trading detected.",
+        "source": "Integrity Engine",
+        "impact_score": 10.0
       },
       {
-        "category": "COLLATERAL",
+        "category": "CAPITAL",
         "severity": "GREEN",
-        "description": "Corporate guarantee provided",
-        "source": "Guarantee Documents",
+        "description": "Near-zero Debt/Equity ratio (0.02).",
+        "source": "Financial Statements",
         "impact_score": 10.0
       },
       {
         "category": "CONDITIONS",
         "severity": "GREEN",
-        "description": "Sector NPA rate: 0.8% (low risk)",
-        "source": "RBI Sector Data",
+        "description": "Sector Outlook: POSITIVE. Low Sector NPA (0.4%).",
+        "source": "Market Intelligence",
         "impact_score": 5.0
       }
     ],
-    "reasoning": "Total Credit Score: 96.0/100\n\nComponent Scores:\n  CHARACTER (25%): 100.0/100\n  CAPACITY (30%): 95.0/100\n  CAPITAL (20%): 100.0/100\n  COLLATERAL (15%): 100.0/100\n  CONDITIONS (10%): 75.0/100\n\nKey Findings:\n  [GREEN] Corporate guarantee provided (Source: Guarantee Documents)\n  [GREEN] Clean audit opinion (Source: Audit Report)\n  [GREEN] Sector NPA rate: 0.8% (low risk) (Source: RBI Sector Data)\n  [LOW] Revenue growth 5.1% (moderate) (Source: Financial Statements)",
-    "decision_narrative": "Key factors: Corporate guarantee provided; Clean audit opinion; Sector NPA rate: 0.8% (low risk)"
+    "reasoning": "Total Credit Score: 98.5/100. Exceptional financial health. Clean GST-Bank reconciliation. Triple-A rating validated by OSINT agents.",
+    "decision_narrative": "Approved at prime interest rate of 7.25% due to impeccable character and fortress balance sheet."
   }
 }

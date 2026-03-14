@@ -1721,7 +1721,10 @@ def main():
             }
         )
         
-        st.session_state.current_page = selected
+        # Fix: Only update and rerun if selection changed
+        if selected != st.session_state.current_page:
+            st.session_state.current_page = selected
+            st.rerun()
         
         st.markdown("---")
         
