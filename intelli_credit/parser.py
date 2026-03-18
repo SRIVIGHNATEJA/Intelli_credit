@@ -29,8 +29,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_FILE_SIZE_MB = 8
-MAX_PAGES = 20
+MAX_FILE_SIZE_MB = 100
+MAX_PAGES = 500
 VALID_DOCUMENT_TYPES = [
     "balance_sheet",
     "profit_loss",

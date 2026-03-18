@@ -1077,20 +1077,19 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
             
             # Short-circuit exact formatting to match regular return signature
             return ScoreResult(
-                total_score=10.0,  # Floor score geometrically
+                character_score=10.0,
+                capacity_score=10.0,
+                capital_score=10.0,
+                collateral_score=10.0,
+                conditions_score=10.0,
+                final_score=10.0,  # Floor score geometrically
                 verdict=Verdict.REJECT,
                 flags=all_flags,
-                five_cs_scores={
-                    "CHARACTER": 10.0,
-                    "CAPACITY": 10.0,
-                    "CAPITAL": 10.0,
-                    "COLLATERAL": 10.0,
-                    "CONDITIONS": 10.0
-                },
                 reasoning=f"TECHNICAL REJECT: Core financials completely missing ({', '.join(missing_critical)}). Instant rejection executed. Bypass mode active.",
                 decision_narrative=reject_flag.description,
                 score_trails={"SYSTEM": ["Base: 100", f"-90.0: {reject_flag.description}", "Total: 10.0"]},
-                loan_term={"amount": None, "rate": None}
+                loan_amount=None,
+                interest_rate=None
             )
     
     # Calculate each C score
