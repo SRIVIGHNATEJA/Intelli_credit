@@ -36,6 +36,14 @@ SECTOR_NPA = {
     "Construction": 8.8
 }
 
+# ============================================================================
+# LOAN AMOUNT CAPS
+# ============================================================================
+
+MAX_LOAN_APPROVE = 5000.0
+MAX_LOAN_CONDITIONAL = 2500.0
+MIN_LOAN = 1.0
+
 
 # ============================================================================
 # TASK 7.1: UTILITY FUNCTIONS
@@ -80,12 +88,8 @@ def generate_reasoning(
     Returns:
         str: Reasoning text
     """
-    # Sort flags by severity (HIGH first) and then by absolute impact (highest first)
-    severity_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, "GREEN": 3}
-    sorted_flags = sorted(
-        flags,
-        key=lambda f: (severity_order.get(f.severity.value, 4), -abs(f.impact_score))
-    )
+    # Sort flags by absolute impact (highest first)
+    sorted_flags = sorted(flags, key=lambda f: -abs(f.impact_score))
     
     # Build reasoning
     lines = [
@@ -993,14 +997,14 @@ def determine_verdict(final_score: float, bank_credits_annual: Optional[float], 
     # CRITICAL FIX: Ensure proper comparison logic
     if final_score >= 70.0:
         # APPROVE
-        if bank_credits_annual is not None and loan_requested is not None:
-            loan_amount = min(bank_credits_annual * 3.5, loan_requested)
-        elif bank_credits_annual is not None:
-            loan_amount = round(bank_credits_annual * 3.5, 2)
-        elif loan_requested is not None:
-            loan_amount = loan_requested
-        else:
-            loan_amount = None
+        loan_amount = max(
+            MIN_LOAN,
+            min(
+                bank_credits_annual * 3.5 if bank_credits_annual else float('inf'),
+                loan_requested if loan_requested else float('inf'),
+                MAX_LOAN_APPROVE
+            )
+        )
         
         # Formula: 10.5% + (70 - score) * 0.1
         # For scores >= 70, this gives rates <= 10.5%
@@ -1014,14 +1018,14 @@ def determine_verdict(final_score: float, bank_credits_annual: Optional[float], 
     
     elif final_score >= 50.0:
         # CONDITIONAL APPROVE
-        if bank_credits_annual is not None and loan_requested is not None:
-            loan_amount = min(bank_credits_annual * 2.0, loan_requested)
-        elif bank_credits_annual is not None:
-            loan_amount = round(bank_credits_annual * 2.0, 2)
-        elif loan_requested is not None:
-            loan_amount = round(loan_requested * 0.7, 2)
-        else:
-            loan_amount = None
+        loan_amount = max(
+            MIN_LOAN,
+            min(
+                bank_credits_annual * 2.0 if bank_credits_annual else float('inf'),
+                loan_requested if loan_requested else float('inf'),
+                MAX_LOAN_CONDITIONAL
+            )
+        )
         
         # Formula: 10.5% + (70 - score) * 0.15
         interest_rate = 10.5 + ((70 - final_score) * 0.15)
@@ -1223,11 +1227,8 @@ def calculate_five_cs(company_data: CompanyData) -> ScoreResult:
         all_flags
     )
     
-    # Create decision narrative from top 3 flags (HIGH severity first, highest impact first)
-    top_flags = sorted(
-        all_flags,
-        key=lambda f: ({"HIGH": 0, "MEDIUM": 1, "LOW": 2, "GREEN": 3}.get(f.severity.value, 4), -abs(f.impact_score))
-    )[:3]
+    # Create decision narrative from top 3 flags (highest absolute impact first)
+    top_flags = sorted(all_flags, key=lambda f: -abs(f.impact_score))[:3]
     
     if top_flags:
         narrative_parts = [f.description for f in top_flags]

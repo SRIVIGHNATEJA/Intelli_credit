@@ -33,3 +33,9 @@ python-dotenv==1.0.1
 
 # Date/Time
 python-dateutil==2.8.2
+
+# Stock Data
+yfinance>=0.2.18
+
+# Google Gemini API
+google-generativeai>=0.8.0

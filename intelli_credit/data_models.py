@@ -396,6 +396,7 @@ class CompanyData:
     
     officer_notes: List[OfficerNote] = field(default_factory=list)
     early_warnings: List[EarlyWarning] = field(default_factory=list)
+    gst_flags: List[FlagItem] = field(default_factory=list)
     
     # Processing metadata
     processing_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -414,6 +415,7 @@ class CompanyData:
             "research": self.research.to_dict() if self.research else None,
             "officer_notes": [note.to_dict() for note in self.officer_notes],
             "early_warnings": [warning.to_dict() for warning in self.early_warnings],
+            "gst_flags": [f.to_dict() for f in self.gst_flags],
             "processing_timestamp": self.processing_timestamp,
             "demo_mode": self.demo_mode,
             "cibil_cmr_rank": self.cibil_cmr_rank

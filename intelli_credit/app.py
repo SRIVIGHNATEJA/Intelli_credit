@@ -651,7 +651,7 @@ def page_application_intake():
                 min_value=1,
                 max_value=10,
                 value=3,
-                help="1 = Lowest risk (best), 10 = Highest risk (worst)"
+                help="CMR 1 = Best (lowest risk), CMR 10 = Worst (highest risk). Scores above CMR 6 are flagged."
             )
             
             if cibil_score > 6:
@@ -1141,6 +1141,29 @@ def page_credit_analysis():
                 st.session_state.score_result.collateral_score = adjusted_scores["COLLATERAL"]
                 st.session_state.score_result.conditions_score = adjusted_scores["CONDITIONS"]
                 st.session_state.score_result.final_score = round(adjusted_total, 1)
+                
+                # Update verdict based on adjusted score
+                from scorer import determine_verdict
+                updated = determine_verdict(
+                    adjusted_total,
+                    st.session_state.company_data.financials.bank_credits_annual,
+                    st.session_state.company_data.financials.loan_requested
+                )
+                st.session_state.score_result.verdict = updated["verdict"]
+                st.session_state.score_result.loan_amount = updated["loan_amount"]
+                st.session_state.score_result.interest_rate = updated["interest_rate"]
+                
+                # Regenerate CAM button
+                if st.button("📄 Regenerate CAM with Officer Adjustments"):
+                    from report_generator import generate_cam_word
+                    cam_path = os.path.join("outputs", f"{st.session_state.company_data.cin}_CAM_updated.docx")
+                    generate_cam_word(
+                        st.session_state.company_data,
+                        st.session_state.score_result,
+                        cam_path
+                    )
+                    st.session_state.cam_path = cam_path
+                    st.success("✅ CAM regenerated with officer adjustments")
         else:
             st.warning("Company data not available for officer assessment")
     
@@ -1207,11 +1230,11 @@ def page_credit_analysis():
 
 
 # ============================================================================
-# PAGE: RISK FLAGS
+# PAGE: CREDIT SIGNALS
 # ============================================================================
 
-def page_risk_flags():
-    """Risk flags detailed view"""
+def page_credit_signals():
+    """Credit signals detailed view"""
     
     score_result = st.session_state.score_result
     company_data = st.session_state.company_data
@@ -1220,7 +1243,7 @@ def page_risk_flags():
         st.error("No data available")
         return
     
-    st.markdown('<div class="section-header">🚨 Risk Flags & Warnings</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📊 Credit Signals & Indicators</div>', unsafe_allow_html=True)
     
     if not score_result.flags:
         st.success("✅ No risk flags detected - Clean credit profile")
@@ -1283,48 +1306,55 @@ def page_risk_flags():
     
     st.markdown("")
     
-    # Display flags
-    high_flags = [f for f in score_result.flags if f.severity.value == "HIGH"]
-    medium_flags = [f for f in score_result.flags if f.severity.value == "MEDIUM"]
-    low_flags = [f for f in score_result.flags if f.severity.value == "LOW"]
-    green_flags = [f for f in score_result.flags if f.severity.value == "GREEN"]
+    # Separate flags into risk factors and positive indicators
+    risk_flags = [f for f in score_result.flags if f.severity.value != "GREEN"]
+    positive_flags = [f for f in score_result.flags if f.severity.value == "GREEN"]
     
-    if high_flags:
-        st.markdown("### 🔴 HIGH Severity")
-        for flag in high_flags:
-            st.markdown(f"""
-            <div class="flag-card-high">
-                <strong style="font-size: 1.1rem;">{flag.category.value}</strong><br>
-                <span style="font-size: 1rem;">{flag.description}</span><br>
-                <small style="opacity: 0.8;">Source: {flag.source} | Impact: {flag.impact_score:.1f}</small>
-            </div>
-            """, unsafe_allow_html=True)
+    # Display risk factors
+    if risk_flags:
+        st.markdown("### ⚠️ Risk Factors")
+        
+        high_flags = [f for f in risk_flags if f.severity.value == "HIGH"]
+        medium_flags = [f for f in risk_flags if f.severity.value == "MEDIUM"]
+        low_flags = [f for f in risk_flags if f.severity.value == "LOW"]
+        
+        if high_flags:
+            st.markdown("#### 🔴 HIGH Severity")
+            for flag in high_flags:
+                st.markdown(f"""
+                <div class="flag-card-high">
+                    <strong style="font-size: 1.1rem;">{flag.category.value}</strong><br>
+                    <span style="font-size: 1rem;">{flag.description}</span><br>
+                    <small style="opacity: 0.8;">Source: {flag.source} | Impact: {flag.impact_score:.1f}</small>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        if medium_flags:
+            st.markdown("#### 🟡 MEDIUM Severity")
+            for flag in medium_flags:
+                st.markdown(f"""
+                <div class="flag-card-medium">
+                    <strong style="font-size: 1.1rem;">{flag.category.value}</strong><br>
+                    <span style="font-size: 1rem;">{flag.description}</span><br>
+                    <small style="opacity: 0.8;">Source: {flag.source} | Impact: {flag.impact_score:.1f}</small>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        if low_flags:
+            st.markdown("#### 🔵 LOW Severity")
+            for flag in low_flags:
+                st.markdown(f"""
+                <div class="flag-card-low">
+                    <strong style="font-size: 1.1rem;">{flag.category.value}</strong><br>
+                    <span style="font-size: 1rem;">{flag.description}</span><br>
+                    <small style="opacity: 0.8;">Source: {flag.source} | Impact: {flag.impact_score:.1f}</small>
+                </div>
+                """, unsafe_allow_html=True)
     
-    if medium_flags:
-        st.markdown("### 🟡 MEDIUM Severity")
-        for flag in medium_flags:
-            st.markdown(f"""
-            <div class="flag-card-medium">
-                <strong style="font-size: 1.1rem;">{flag.category.value}</strong><br>
-                <span style="font-size: 1rem;">{flag.description}</span><br>
-                <small style="opacity: 0.8;">Source: {flag.source} | Impact: {flag.impact_score:.1f}</small>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    if low_flags:
-        st.markdown("### 🔵 LOW Severity")
-        for flag in low_flags:
-            st.markdown(f"""
-            <div class="flag-card-low">
-                <strong style="font-size: 1.1rem;">{flag.category.value}</strong><br>
-                <span style="font-size: 1rem;">{flag.description}</span><br>
-                <small style="opacity: 0.8;">Source: {flag.source} | Impact: {flag.impact_score:.1f}</small>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    if green_flags:
-        st.markdown("### 🟢 POSITIVE Factors")
-        for flag in green_flags:
+    # Display positive indicators
+    if positive_flags:
+        st.markdown("### ✅ Positive Indicators")
+        for flag in positive_flags:
             st.markdown(f"""
             <div class="flag-card-green">
                 <strong style="font-size: 1.1rem;">{flag.category.value}</strong><br>
@@ -1387,7 +1417,7 @@ def page_research():
         </div>
         """, unsafe_allow_html=True)
     with s2:
-        outlook_emoji = {"GROWING": "📈", "STABLE": "➡️", "DECLINING": "📉", "DISTRESSED": "🚨"}.get(research.sector_outlook, "➡️")
+        outlook_emoji = {"GROWING": "📈", "STABLE": "➡️", "DECLINING": "📉", "DISTRESSED": "🔴"}.get(research.sector_outlook, "➡️")
         outlook_color = {"POSITIVE": "#10b981", "NEUTRAL": "#f59e0b", "DISTRESSED": "#ef4444"}.get(research.sector_outlook, "#6b7280")
         st.markdown(f"""
         <div style="text-align: center; padding: 1rem;">
@@ -1703,7 +1733,7 @@ def main():
         
         # Navigation menu
         if st.session_state.processing_complete:
-            menu_options = ["Application Intake", "Credit Analysis", "Risk Flags", "Research Insights", "CAM Report"]
+            menu_options = ["Application Intake", "Credit Analysis", "Credit Signals", "Research Insights", "CAM Report"]
             menu_icons = ["📂", "📊", "🚨", "📰", "📄"]
         else:
             menu_options = ["Application Intake"]
@@ -1818,8 +1848,8 @@ def main():
         page_application_intake()
     elif st.session_state.current_page == "Credit Analysis":
         page_credit_analysis()
-    elif st.session_state.current_page == "Risk Flags":
-        page_risk_flags()
+    elif st.session_state.current_page == "Credit Signals":
+        page_credit_signals()
     elif st.session_state.current_page == "Research Insights":
         page_research()
     elif st.session_state.current_page == "CAM Report":
